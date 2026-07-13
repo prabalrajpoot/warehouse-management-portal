@@ -1,0 +1,7 @@
+{
+  "include": [
+    "backend"
+  ],
+  "venvPath": "d:/warehouse-management-portal/backend",
+  "venv": "venv"
+}
