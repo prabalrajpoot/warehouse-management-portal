@@ -6,6 +6,7 @@ from app.database.db import get_db
 from app.models.kits import Kit
 from app.utils.jwt_handler import get_current_user
 from app.utils.logging import log_activity
+from app.utils.cache import clear_dashboard_cache
 
 router = APIRouter()
 
@@ -41,6 +42,7 @@ def create_kit(
     )
     db.add(new_kit)
     db.commit()
+    clear_dashboard_cache()
     db.refresh(new_kit)
     
     log_activity(
@@ -94,6 +96,7 @@ def update_kit(
     kit.quantity = payload.quantity  # type: ignore
 
     db.commit()
+    clear_dashboard_cache()
     db.refresh(kit)
     
     log_activity(
@@ -123,6 +126,7 @@ def delete_kit(
 
     db.delete(kit)
     db.commit()
+    clear_dashboard_cache()
     
     log_activity(
         db=db,
@@ -165,6 +169,7 @@ def create_kits_bulk(
             )
         db.add_all(new_kits)
         db.commit()
+        clear_dashboard_cache()
         
         log_activity(
             db=db,
@@ -194,6 +199,7 @@ def delete_kits_bulk(
     try:
         db.query(Kit).filter(Kit.id.in_(payload.ids)).delete(synchronize_session=False)
         db.commit()
+        clear_dashboard_cache()
         
         log_activity(
             db=db,

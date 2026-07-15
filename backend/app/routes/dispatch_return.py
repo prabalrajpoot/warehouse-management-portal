@@ -6,6 +6,7 @@ from app.database.db import get_db
 from app.models.dispatch_return import DispatchReturn
 from app.utils.jwt_handler import get_current_user
 from app.utils.logging import log_activity
+from app.utils.cache import clear_dashboard_cache
 
 router = APIRouter()
 
@@ -39,6 +40,7 @@ def create_return(
     )
     db.add(new_return)
     db.commit()
+    clear_dashboard_cache()
     db.refresh(new_return)
     
     log_activity(
@@ -89,6 +91,7 @@ def update_return(
     entry.ms_barcode = payload.ms_barcode  # type: ignore
 
     db.commit()
+    clear_dashboard_cache()
     db.refresh(entry)
     
     log_activity(
@@ -118,6 +121,7 @@ def delete_return(
 
     db.delete(entry)
     db.commit()
+    clear_dashboard_cache()
     
     log_activity(
         db=db,
@@ -156,6 +160,7 @@ def create_returns_bulk(
             )
         db.add_all(new_returns)
         db.commit()
+        clear_dashboard_cache()
         
         log_activity(
             db=db,
@@ -185,6 +190,7 @@ def delete_returns_bulk(
     try:
         db.query(DispatchReturn).filter(DispatchReturn.id.in_(payload.ids)).delete(synchronize_session=False)
         db.commit()
+        clear_dashboard_cache()
         
         log_activity(
             db=db,

@@ -10,6 +10,7 @@ from app.models.dispatch_return import DispatchReturn
 from app.models.inventory_inward import InventoryInward
 from app.models.inventory_outward import InventoryOutward
 import datetime
+from app.utils.cache import DASHBOARD_CACHE, clear_dashboard_cache
 
 router = APIRouter()
 
@@ -33,6 +34,10 @@ def dashboard(
     year: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
+    cache_key = ("dashboard", warehouse, trade, month, year)
+    if cache_key in DASHBOARD_CACHE:
+        return DASHBOARD_CACHE[cache_key]
+
     # Fetch all unique warehouses, trades, and years dynamically for dropdowns
     wh_set = set()
     for row in db.query(Kit.warehouse_name).distinct():
@@ -332,7 +337,7 @@ def dashboard(
         if y != "Unknown"
     ]
 
-    return {
+    res = {
         "total_kits": total_kits,
         "total_dispatched": total_dispatched,
         "total_inspected": total_inspected,
@@ -358,6 +363,8 @@ def dashboard(
         "trades": all_trades,
         "years": all_years
     }
+    DASHBOARD_CACHE[cache_key] = res
+    return res
 
 
 def get_month_key(date_obj):
@@ -438,6 +445,7 @@ def update_delivery_override(
         )
         db.add(entry)
     db.commit()
+    clear_dashboard_cache()
     return {"message": "Delivery updated successfully"}
 
 
@@ -446,6 +454,10 @@ def get_dashboard_reports(
     selected_date: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
+    cache_key = ("reports", selected_date)
+    if cache_key in DASHBOARD_CACHE:
+        return DASHBOARD_CACHE[cache_key]
+
     # Parse target selected date
     target_dt = parse_date(selected_date) if selected_date else datetime.datetime.now()
     if not target_dt:
@@ -660,8 +672,10 @@ def get_dashboard_reports(
             row_b["today_inspection_cleared"] = 0
             row_b["today_dispatch"] = 0
 
-    return {
+    res = {
         "months": months_list,
         "offering_report": offering_report,
         "summary_report": summary_report
     }
+    DASHBOARD_CACHE[cache_key] = res
+    return res

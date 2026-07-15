@@ -7,6 +7,7 @@ from app.models.dispatch import Dispatch
 import pandas as pd
 from app.utils.jwt_handler import get_current_user
 from app.utils.logging import log_activity
+from app.utils.cache import clear_dashboard_cache
 
 router = APIRouter()
 
@@ -164,6 +165,7 @@ def create_dispatch(
     )
     db.add(new_dispatch)
     db.commit()
+    clear_dashboard_cache()
     db.refresh(new_dispatch)
     
     log_activity(
@@ -217,6 +219,7 @@ def update_dispatch(
     dispatch.packaging_status = payload.packaging_status  # type: ignore
 
     db.commit()
+    clear_dashboard_cache()
     db.refresh(dispatch)
     
     log_activity(
@@ -246,6 +249,7 @@ def delete_dispatch(
 
     db.delete(dispatch)
     db.commit()
+    clear_dashboard_cache()
     
     log_activity(
         db=db,
@@ -289,6 +293,7 @@ def create_dispatches_bulk(
             )
         db.add_all(new_dispatches)
         db.commit()
+        clear_dashboard_cache()
         
         log_activity(
             db=db,
@@ -322,6 +327,7 @@ def update_dispatches_status_bulk(
             synchronize_session=False
         )
         db.commit()
+        clear_dashboard_cache()
         
         log_activity(
             db=db,
@@ -351,6 +357,7 @@ def delete_dispatches_bulk(
     try:
         db.query(Dispatch).filter(Dispatch.id.in_(payload.ids)).delete(synchronize_session=False)
         db.commit()
+        clear_dashboard_cache()
         
         log_activity(
             db=db,
@@ -487,6 +494,7 @@ async def upload_dispatch_excel(
         batch = objects_to_insert[i:i + batch_size]
         db.bulk_insert_mappings(Dispatch, batch)
         db.commit()
+    clear_dashboard_cache()
 
     log_activity(
         db=db,

@@ -6,6 +6,7 @@ from app.database.db import get_db
 from app.models.inspection import Inspection
 from app.utils.jwt_handler import get_current_user
 from app.utils.logging import log_activity
+from app.utils.cache import clear_dashboard_cache
 
 router = APIRouter()
 
@@ -47,6 +48,7 @@ def create_inspection(
     )
     db.add(new_inspection)
     db.commit()
+    clear_dashboard_cache()
     db.refresh(new_inspection)
     
     log_activity(
@@ -102,6 +104,7 @@ def update_inspection(
     inspection.quantity = payload.quantity  # type: ignore
 
     db.commit()
+    clear_dashboard_cache()
     db.refresh(inspection)
     
     log_activity(
@@ -131,6 +134,7 @@ def delete_inspection(
 
     db.delete(inspection)
     db.commit()
+    clear_dashboard_cache()
     
     log_activity(
         db=db,
@@ -176,6 +180,7 @@ def create_inspections_bulk(
             )
         db.add_all(new_inspections)
         db.commit()
+        clear_dashboard_cache()
         
         log_activity(
             db=db,
@@ -213,6 +218,7 @@ def update_inspections_result_bulk(
             synchronize_session=False
         )
         db.commit()
+        clear_dashboard_cache()
         
         log_activity(
             db=db,
@@ -242,6 +248,7 @@ def delete_inspections_bulk(
     try:
         db.query(Inspection).filter(Inspection.id.in_(payload.ids)).delete(synchronize_session=False)
         db.commit()
+        clear_dashboard_cache()
         
         log_activity(
             db=db,
