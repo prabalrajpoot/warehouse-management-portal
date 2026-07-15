@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import Loader from "../components/Loader";
 import Navbar from "../components/Navbar";
 import api from "../api/api";
 import { FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch, FiFilter, FiMapPin, FiLayers } from "react-icons/fi";
@@ -18,6 +19,7 @@ function Warehouses() {
   const [warehouses, setWarehouses] = useState([]);
   const [mappings, setMappings] = useState([]);
   const [msg, setMsg] = useState("");
+  const [loading, setLoading] = useState(true);
 
   // Warehouse Form States
   const [showWhForm, setShowWhForm] = useState(false);
@@ -80,8 +82,17 @@ function Warehouses() {
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
-    fetchWarehouses();
-    fetchMappings();
+    const init = async () => {
+      try {
+        setLoading(true);
+        await Promise.all([fetchWarehouses(), fetchMappings()]);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    init();
   }, []);
 
   const fetchWarehouses = async () => {
@@ -357,8 +368,12 @@ function Warehouses() {
           </button>
         </div>
 
-        {/* TAB 1: WAREHOUSES LIST */}
-        {activeTab === "warehouses" && (
+        {loading ? (
+          <Loader message="Loading warehouses data..." />
+        ) : (
+          <>
+            {/* TAB 1: WAREHOUSES LIST */}
+            {activeTab === "warehouses" && (
           <>
             {/* Action Bar */}
             <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "16px" }}>
@@ -897,6 +912,8 @@ function Warehouses() {
                 </table>
               </div>
             </div>
+          </>
+        )}
           </>
         )}
 

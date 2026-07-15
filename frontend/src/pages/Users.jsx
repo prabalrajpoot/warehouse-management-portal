@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import Loader from "../components/Loader";
 import Navbar from "../components/Navbar";
 import api from "../api/api";
 import {
@@ -243,7 +244,7 @@ function Users() {
           </div>
 
           {loading ? (
-            <div className="empty-state">Loading users...</div>
+            <Loader message="Loading users..." />
           ) : (
             <div style={{ overflowX: "auto" }}>
               <table className="data-table">

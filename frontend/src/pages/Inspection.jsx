@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import Loader from "../components/Loader";
 import Navbar from "../components/Navbar";
 import api from "../api/api";
 import { FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch, FiDownload, FiUpload } from "react-icons/fi";
@@ -118,6 +119,8 @@ function Inspection() {
   const [inspections, setInspections] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [msg, setMsg] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
   const [bulkResult, setBulkResult] = useState("");
 
   // Column filters
@@ -164,8 +167,17 @@ function Inspection() {
   const [warehouses, setWarehouses] = useState([]);
 
   useEffect(() => {
-    fetchInspections();
-    fetchWarehouses();
+    const init = async () => {
+      try {
+        setLoading(true);
+        await Promise.all([fetchInspections(), fetchWarehouses()]);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    init();
   }, []);
 
   const fetchInspections = async () => {
@@ -190,6 +202,7 @@ function Inspection() {
     const file = e.target.files[0];
     if (!file) return;
 
+    setUploading(true);
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
@@ -282,8 +295,10 @@ function Inspection() {
           return;
         }
 
-        const confirmImport = window.confirm(`Found ${parsedRows.length} valid rows. Import them now?`);
-        if (!confirmImport) return;
+        if (!confirmImport) {
+          setUploading(false);
+          return;
+        }
 
         await api.post("/inspection/bulk", parsedRows);
         alert(`Successfully imported ${parsedRows.length} historical inspection records!`);
@@ -291,6 +306,8 @@ function Inspection() {
       } catch (err) {
         console.error(err);
         alert("An error occurred while parsing the file. Please ensure it is a valid Excel or CSV sheet.");
+      } finally {
+        setUploading(false);
       }
     };
     reader.readAsBinaryString(file);
@@ -659,7 +676,13 @@ function Inspection() {
           </div>
         </div>
 
-        {/* Add Entry Card */}
+      {uploading ? (
+        <Loader message="Uploading and parsing inspection records from Excel..." />
+      ) : loading ? (
+        <Loader message="Loading inspection records..." />
+      ) : (
+        <>
+          {/* Add Entry Card */}
         {showForm && !isReadOnly() && (
           <div className="card">
             <div className="card-title">New Inspection Entry</div>
@@ -1113,6 +1136,8 @@ function Inspection() {
             </div>
           )}
         </div>
+        </>
+      )}
 
       </div>
     </div>

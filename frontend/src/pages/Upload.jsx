@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import Loader from "../components/Loader";
 import Navbar from "../components/Navbar";
 import api from "../api/api";
 import { FiUpload, FiSearch, FiEdit2, FiTrash2, FiCheck, FiX, FiPlus, FiDownload } from "react-icons/fi";
@@ -18,6 +19,8 @@ function Upload() {
   const [columns, setColumns] = useState([]);
   const [search, setSearch] = useState("");
   const [uploadMsg, setUploadMsg] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [newRowData, setNewRowData] = useState({});
@@ -36,12 +39,15 @@ function Upload() {
 
   const fetchData = async (page = currentPage, searchQuery = search) => {
     try {
+      setLoading(true);
       const response = await api.get(`/upload-data?page=${page}&page_size=${pageSize}&search=${searchQuery}`);
       setData(response.data.rows || []);
       setColumns(response.data.columns || []);
       setTotalRows(response.data.total_rows || 0);
     } catch (error) {
       console.log(error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -52,6 +58,7 @@ function Upload() {
   const uploadFile = async () => {
     if (!file) { setUploadMsg("Please select a file first."); return; }
     try {
+      setUploading(true);
       const formData = new FormData();
       formData.append("file", file);
       await api.post("/upload", formData);
@@ -62,6 +69,8 @@ function Upload() {
     } catch (error) {
       const errMsg = error.response?.data?.detail || "Upload failed. Check file format.";
       setUploadMsg(`❌ ${errMsg}`);
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -224,9 +233,15 @@ function Upload() {
           </div>
         </div>
 
-        {/* Import Excel Section */}
-        <div className="card">
-          <div className="card-title">Import Excel File</div>
+      {uploading ? (
+        <Loader message="Uploading and processing Excel workbook..." />
+      ) : loading ? (
+        <Loader message="Loading uploaded data logs..." />
+      ) : (
+        <>
+          {/* Import Excel Section */}
+          <div className="card">
+            <div className="card-title">Import Excel File</div>
           <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
             <label style={{
               display: "inline-flex", alignItems: "center", gap: "8px",
@@ -411,6 +426,9 @@ function Upload() {
             </div>
           )}
         </div>
+
+        </>
+      )}
 
       </div>
     </div>

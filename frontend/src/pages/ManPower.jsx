@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import Loader from "../components/Loader";
 import Navbar from "../components/Navbar";
 import api from "../api/api";
 import { FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch, FiUpload } from "react-icons/fi";
@@ -114,6 +115,8 @@ const MANPOWER_LOCATIONS = [
 
 function ManPower() {
   const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
   const [warehouses] = useState(
     MANPOWER_LOCATIONS.map((name, idx) => ({ id: idx, name }))
   );
@@ -204,10 +207,13 @@ function ManPower() {
 
   const fetchRecords = async () => {
     try {
+      setLoading(true);
       const res = await api.get("/man-power");
       setRecords(filterByWarehouse(res.data, "warehouse_location"));
     } catch (e) {
       console.error("Failed to fetch man power records:", e);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -236,6 +242,7 @@ function ManPower() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setUploading(true);
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
@@ -304,8 +311,10 @@ function ManPower() {
           return;
         }
 
-        const confirmImport = window.confirm(`Found ${parsedRows.length} valid rows. Import them now?`);
-        if (!confirmImport) return;
+        if (!confirmImport) {
+          setUploading(false);
+          return;
+        }
 
         await api.post("/man-power/bulk", parsedRows);
         alert(`Successfully imported ${parsedRows.length} historical logs!`);
@@ -313,6 +322,8 @@ function ManPower() {
       } catch (err) {
         console.error(err);
         alert("An error occurred while parsing the file. Please ensure it is a valid Excel or CSV sheet.");
+      } finally {
+        setUploading(false);
       }
     };
     reader.readAsBinaryString(file);
@@ -676,8 +687,14 @@ function ManPower() {
           </div>
         </div>
 
-        {/* New entry form */}
-        {showForm && !isReadOnly() && (
+        {uploading ? (
+          <Loader message="Uploading and processing manpower Excel logs..." />
+        ) : loading ? (
+          <Loader message="Loading manpower allocation logs..." />
+        ) : (
+          <>
+            {/* New entry form */}
+            {showForm && !isReadOnly() && (
           <div className="card" style={{ marginBottom: "20px" }}>
             <div className="card-title">New Man Power Entry</div>
             <div className="form-grid" style={{ marginBottom: "16px" }}>
@@ -1594,6 +1611,8 @@ function ManPower() {
               </div>
             </div>
           </div>
+        )}
+          </>
         )}
 
       </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import Loader from "../components/Loader";
 import Navbar from "../components/Navbar";
 import api from "../api/api";
 import {
@@ -215,10 +216,7 @@ function UploadDashboard() {
         </div>
 
         {loading && (
-          <div className="card" style={{ textAlign: "center", padding: "48px" }}>
-            <div style={{ fontSize: "28px", marginBottom: "12px" }}>⏳</div>
-            <div style={{ color: "var(--text-secondary)" }}>Loading analytics...</div>
-          </div>
+          <Loader message="Loading analytics..." />
         )}
 
         {!loading && noData && (

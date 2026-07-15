@@ -35,6 +35,7 @@ function Dashboard() {
   const [activeDashboardTab, setActiveDashboardTab] = useState("overview"); // "overview" | "offering" | "summary"
   const [reports, setReports] = useState({ months: [], offering_report: [], summary_report: [] });
   const [reportsLoading, setReportsLoading] = useState(false);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
   const [editingRowKey, setEditingRowKey] = useState(null);
   const [editVal, setEditVal] = useState("");
   const [theme, setTheme] = useState(localStorage.getItem("theme") || "light");
@@ -85,6 +86,7 @@ function Dashboard() {
 
   const fetchDashboard = async () => {
     try {
+      setDashboardLoading(true);
       const params = {};
       if (isWarehouseManager()) {
         params.warehouse = getWarehouseName();
@@ -99,6 +101,8 @@ function Dashboard() {
       setData(response.data);
     } catch (error) {
       console.log(error);
+    } finally {
+      setDashboardLoading(false);
     }
   };
 
@@ -794,8 +798,42 @@ function Dashboard() {
           </div>
         </div>
 
-        {/* Dashboard Title & Actions Row */}
-        <div className="page-header" style={{ marginBottom: "20px" }}>
+      {dashboardLoading ? (
+        <div style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "400px",
+          gap: "16px",
+          background: "var(--bg-surface)",
+          borderRadius: "var(--radius-lg)",
+          border: "1px solid var(--border)",
+          margin: "20px 0",
+          boxShadow: "var(--shadow)"
+        }}>
+          <div className="loading-spinner" style={{
+            width: "48px",
+            height: "48px",
+            border: "4px solid var(--accent-soft)",
+            borderTop: "4px solid var(--accent)",
+            borderRadius: "50%",
+            animation: "spin 1s linear infinite"
+          }} />
+          <div style={{ color: "var(--text-secondary)", fontSize: "14px", fontWeight: "600" }}>
+            Loading operations dashboard...
+          </div>
+          <style>{`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
+        </div>
+      ) : (
+        <>
+          {/* Dashboard Title & Actions Row */}
+          <div className="page-header" style={{ marginBottom: "20px" }}>
           <div>
             <h1 className="page-title">
               {activeDashboardTab === "overview" && "Operations Dashboard"}
@@ -1054,6 +1092,8 @@ function Dashboard() {
         {activeDashboardTab === "offering" && renderOfferingTable()}
 
         {activeDashboardTab === "summary" && renderSummaryTable()}
+        </>
+      )}
       </div>
     </div>
   );

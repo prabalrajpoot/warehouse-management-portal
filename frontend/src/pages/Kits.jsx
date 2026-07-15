@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import Loader from "../components/Loader";
 import Navbar from "../components/Navbar";
 import api from "../api/api";
 import { FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch, FiDownload, FiUpload } from "react-icons/fi";
@@ -117,6 +118,8 @@ const toYMD = (dateStr) => {
 function Kits() {
   const [kits, setKits] = useState([]);
   const [showForm, setShowForm] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
 
   // Column filters
   const [filterDate, setFilterDate] = useState("");
@@ -154,8 +157,17 @@ function Kits() {
   const [warehouses, setWarehouses] = useState([]);
 
   useEffect(() => {
-    fetchKits();
-    fetchWarehouses();
+    const init = async () => {
+      try {
+        setLoading(true);
+        await Promise.all([fetchKits(), fetchWarehouses()]);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    init();
   }, []);
 
   const fetchKits = async () => {
@@ -180,6 +192,7 @@ function Kits() {
     const file = e.target.files[0];
     if (!file) return;
 
+    setUploading(true);
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
@@ -259,8 +272,10 @@ function Kits() {
           return;
         }
 
-        const confirmImport = window.confirm(`Found ${parsedRows.length} valid rows. Import them now?`);
-        if (!confirmImport) return;
+        if (!confirmImport) {
+          setUploading(false);
+          return;
+        }
 
         await api.post("/kits/bulk", parsedRows);
         alert(`Successfully imported ${parsedRows.length} historical kit records!`);
@@ -268,6 +283,8 @@ function Kits() {
       } catch (err) {
         console.error(err);
         alert("An error occurred while parsing the file. Please ensure it is a valid Excel or CSV sheet.");
+      } finally {
+        setUploading(false);
       }
     };
     reader.readAsBinaryString(file);
@@ -553,6 +570,12 @@ function Kits() {
           </div>
         </div>
 
+      {uploading ? (
+        <Loader message="Uploading and parsing kit records from Excel..." />
+      ) : loading ? (
+        <Loader message="Loading kit records..." />
+      ) : (
+        <>
         {/* Add Entry Card */}
         {showForm && !isReadOnly() && (
           <div className="card">
@@ -910,6 +933,8 @@ function Kits() {
             </div>
           )}
         </div>
+        </>
+      )}
 
       </div>
     </div>

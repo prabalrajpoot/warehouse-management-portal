@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import Loader from "../components/Loader";
 import Navbar from "../components/Navbar";
 import api from "../api/api";
 import { FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch, FiDownload } from "react-icons/fi";
@@ -46,6 +47,7 @@ function InwardSection() {
   const [entries, setEntries] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [msg, setMsg] = useState("");
+  const [loading, setLoading] = useState(true);
 
   // Column filters
   const [filterDate, setFilterDate] = useState("");
@@ -72,8 +74,16 @@ function InwardSection() {
   useEffect(() => { fetchEntries(); }, []);
 
   const fetchEntries = async () => {
-    try { const r = await api.get("/inventory-inward"); setEntries(r.data); }
-    catch (e) { console.log(e); }
+    try {
+      setLoading(true);
+      const r = await api.get("/inventory-inward");
+      setEntries(r.data);
+    }
+    catch (e) {
+      console.log(e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleChange = (key, val) => setForm((f) => ({ ...f, [key]: val }));
@@ -268,7 +278,11 @@ function InwardSection() {
 
   return (
     <>
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginBottom: "16px", alignItems: "center" }}>
+      {loading ? (
+        <Loader message="Loading inward stock logs..." />
+      ) : (
+        <>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginBottom: "16px", alignItems: "center" }}>
         <button className="btn btn-ghost btn-sm" onClick={exportPDF}>
           <FiDownload size={13} /> PDF
         </button>
@@ -490,6 +504,8 @@ function InwardSection() {
           </div>
         )}
       </div>
+        </>
+      )}
     </>
   );
 }
@@ -501,6 +517,7 @@ function OutwardSection() {
   const [entries, setEntries] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [msg, setMsg] = useState("");
+  const [loading, setLoading] = useState(true);
 
   // Column filters
   const [filterDate, setFilterDate] = useState("");
@@ -529,8 +546,16 @@ function OutwardSection() {
   useEffect(() => { fetchEntries(); }, []);
 
   const fetchEntries = async () => {
-    try { const r = await api.get("/inventory-outward"); setEntries(r.data); }
-    catch (e) { console.log(e); }
+    try {
+      setLoading(true);
+      const r = await api.get("/inventory-outward");
+      setEntries(r.data);
+    }
+    catch (e) {
+      console.log(e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleChange = (key, val) => setForm((f) => ({ ...f, [key]: val }));
@@ -725,7 +750,11 @@ function OutwardSection() {
 
   return (
     <>
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginBottom: "16px", alignItems: "center" }}>
+      {loading ? (
+        <Loader message="Loading outward stock logs..." />
+      ) : (
+        <>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginBottom: "16px", alignItems: "center" }}>
         <button className="btn btn-ghost btn-sm" onClick={exportPDF}>
           <FiDownload size={13} /> PDF
         </button>
@@ -922,6 +951,8 @@ function OutwardSection() {
           </div>
         )}
       </div>
+        </>
+      )}
     </>
   );
 }
@@ -1009,7 +1040,7 @@ function AvailableStockSection() {
   });
 
   if (loading) {
-    return <div className="empty-state">Loading stock balance data...</div>;
+    return <Loader message="Loading stock balance data..." />;
   }
 
   return (

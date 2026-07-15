@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import Loader from "../components/Loader";
 import Navbar from "../components/Navbar";
 import api from "../api/api";
 import { FiSearch, FiX, FiActivity } from "react-icons/fi";
@@ -163,7 +164,7 @@ function ActivityLogs() {
         {/* Logs Table Card */}
         <div className="card">
           {loading ? (
-            <div className="empty-state">⏳ Fetching activity trail logs...</div>
+            <Loader message="Fetching activity trail logs..." />
           ) : (
             <>
               <div style={{ overflowX: "auto" }}>

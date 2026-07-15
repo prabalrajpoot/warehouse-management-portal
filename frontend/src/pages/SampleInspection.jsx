@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import Loader from "../components/Loader";
 import Navbar from "../components/Navbar";
 import api from "../api/api";
 import { FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch } from "react-icons/fi";
@@ -55,6 +56,7 @@ function SampleInspection() {
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [msg, setMsg] = useState("");
+  const [loading, setLoading] = useState(true);
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
@@ -77,8 +79,17 @@ function SampleInspection() {
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
 
   useEffect(() => {
-    fetchRecords();
-    fetchWarehouses();
+    const init = async () => {
+      try {
+        setLoading(true);
+        await Promise.all([fetchRecords(), fetchWarehouses()]);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    init();
   }, []);
 
   const fetchRecords = async () => {
@@ -260,8 +271,12 @@ function SampleInspection() {
           </button>
         </div>
 
-        {/* New entry form */}
-        {showForm && (
+        {loading ? (
+          <Loader message="Loading sample inspections..." />
+        ) : (
+          <>
+            {/* New entry form */}
+            {showForm && (
           <div className="card" style={{ marginBottom: "20px" }}>
             <div className="card-title">New Sample Inspection Entry</div>
             <div className="form-grid" style={{ marginBottom: "16px" }}>
@@ -477,6 +492,8 @@ function SampleInspection() {
             </div>
           )}
         </div>
+          </>
+        )}
 
       </div>
     </div>

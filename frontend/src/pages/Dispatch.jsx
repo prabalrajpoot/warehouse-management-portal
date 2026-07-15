@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import Loader from "../components/Loader";
 import Navbar from "../components/Navbar";
 import api from "../api/api";
 import { FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch, FiDownload, FiUpload } from "react-icons/fi";
@@ -77,6 +78,7 @@ const toYMD = (dateStr) => {
 function DispatchLog() {
   const [dispatches, setDispatches] = useState([]);
   const [uploading, setUploading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [msg, setMsg] = useState("");
   const [bulkStatus, setBulkStatus] = useState("");
@@ -119,8 +121,17 @@ function DispatchLog() {
   const [warehouses, setWarehouses] = useState([]);
 
   useEffect(() => {
-    fetchDispatches();
-    fetchWarehouses();
+    const init = async () => {
+      try {
+        setLoading(true);
+        await Promise.all([fetchDispatches(), fetchWarehouses()]);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    init();
   }, []);
 
   const fetchDispatches = async () => {
@@ -408,7 +419,13 @@ function DispatchLog() {
 
   return (
     <>
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginBottom: "16px", alignItems: "center" }}>
+      {uploading ? (
+        <Loader message="Uploading and processing dispatches Excel..." />
+      ) : loading ? (
+        <Loader message="Loading dispatches logs..." />
+      ) : (
+        <>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginBottom: "16px", alignItems: "center" }}>
         <button className="btn btn-ghost btn-sm" onClick={exportPDF}>
           <FiDownload size={13} /> PDF
         </button>
@@ -806,6 +823,8 @@ function DispatchLog() {
           </div>
         )}
       </div>
+        </>
+      )}
     </>
   );
 }
@@ -817,6 +836,112 @@ function ReturnLog() {
   const [returns, setReturns] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [msg, setMsg] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+
+  const handleExcelUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploading(true);
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: "array" });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+        if (jsonData.length === 0) {
+          setMsg("❌ Excel sheet has no data records.");
+          return;
+        }
+
+        const parseExcelDate = (val) => {
+          if (!val) return "";
+          if (typeof val === 'number') {
+            const date = new Date(Math.round((val - 25569) * 86400 * 1000));
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}/${month}/${year}`;
+          }
+          const str = String(val).trim();
+          if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+            const parts = str.split("-");
+            return `${parts[2]}/${parts[1]}/${parts[0]}`;
+          }
+          if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) {
+            return str;
+          }
+          return str;
+        };
+
+        const payload = jsonData.map((row) => {
+          let dateVal = "";
+          let firmVal = "";
+          let whVal = "";
+          let tradeVal = "";
+          let setVal = "";
+          let qtyVal = 1;
+          let barcodeVal = "";
+
+          Object.keys(row).forEach((key) => {
+            const lowerKey = key.toLowerCase();
+            if (lowerKey.includes("date")) {
+              dateVal = parseExcelDate(row[key]);
+            } else if (lowerKey.includes("firm") || lowerKey.includes("vendor")) {
+              firmVal = String(row[key]).trim().toUpperCase();
+            } else if (lowerKey.includes("warehouse") || lowerKey.includes("location") || lowerKey.includes("site")) {
+              whVal = String(row[key]).trim();
+            } else if (lowerKey.includes("trade")) {
+              tradeVal = String(row[key]).trim();
+            } else if (lowerKey.includes("set") || lowerKey.includes("type")) {
+              setVal = String(row[key]).trim().toUpperCase();
+            } else if (lowerKey.includes("qty") || lowerKey.includes("quantity") || lowerKey.includes("units")) {
+              const parsedQty = parseInt(row[key], 10);
+              qtyVal = isNaN(parsedQty) ? 1 : parsedQty;
+            } else if (
+              lowerKey.includes("barcode") ||
+              lowerKey.includes("ms") ||
+              lowerKey.includes("serial") ||
+              lowerKey.includes("label")
+            ) {
+              barcodeVal = String(row[key]).trim();
+            }
+          });
+
+          return {
+            dispatched_date: dateVal || new Date().toLocaleDateString("en-GB"),
+            firm: firmVal || null,
+            warehouse_name: whVal || null,
+            trade: tradeVal || null,
+            set_type: setVal || null,
+            quantity: qtyVal,
+            ms_barcode: barcodeVal || null
+          };
+        });
+
+        if (!window.confirm(`Do you want to upload ${payload.length} return records parsed from Excel?`)) {
+          setUploading(false);
+          e.target.value = "";
+          return;
+        }
+
+        const r = await api.post("/dispatch-return/bulk", payload);
+        setMsg(`✅ ${r.data.message || "Imported successfully!"}`);
+        fetchReturns();
+      } catch (err) {
+        console.error(err);
+        setMsg(`❌ Failed to import returns: ${err.response?.data?.detail || err.message}`);
+      } finally {
+        setUploading(false);
+        e.target.value = "";
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
 
   // Column filters
   const [filterDate, setFilterDate] = useState("");
@@ -853,8 +978,17 @@ function ReturnLog() {
   const [warehouses, setWarehouses] = useState([]);
 
   useEffect(() => {
-    fetchReturns();
-    fetchWarehouses();
+    const init = async () => {
+      try {
+        setLoading(true);
+        await Promise.all([fetchReturns(), fetchWarehouses()]);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    init();
   }, []);
 
   const fetchReturns = async () => {
@@ -1052,7 +1186,23 @@ function ReturnLog() {
 
   return (
     <>
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginBottom: "16px", alignItems: "center" }}>
+      {uploading ? (
+        <Loader message="Importing return records from Excel..." />
+      ) : loading ? (
+        <Loader message="Loading returns logs..." />
+      ) : (
+        <>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginBottom: "16px", alignItems: "center" }}>
+        <input
+          type="file"
+          id="return-excel-upload"
+          accept=".xlsx,.xls"
+          style={{ display: "none" }}
+          onChange={handleExcelUpload}
+        />
+        <button className="btn btn-ghost btn-sm" onClick={() => document.getElementById("return-excel-upload").click()}>
+          <FiUpload size={13} /> Import Excel
+        </button>
         <button className="btn btn-ghost btn-sm" onClick={exportPDF}>
           <FiDownload size={13} /> PDF
         </button>
@@ -1063,6 +1213,12 @@ function ReturnLog() {
           <FiPlus size={14} /> {showForm ? "Cancel" : "Add Return Entry"}
         </button>
       </div>
+
+      {msg && (
+        <div className={`alert ${msg.startsWith("❌") || msg.includes("Failed") ? "alert-error" : "alert-success"}`} style={{ marginBottom: "16px" }}>
+          {msg}
+        </div>
+      )}
 
       {showForm && (
         <div className="card">
@@ -1373,6 +1529,8 @@ function ReturnLog() {
           </div>
         )}
       </div>
+        </>
+      )}
     </>
   );
 }
