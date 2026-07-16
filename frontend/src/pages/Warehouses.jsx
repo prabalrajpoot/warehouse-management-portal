@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
 import api from "../api/api";
-import { FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch, FiFilter, FiMapPin, FiLayers } from "react-icons/fi";
+import { FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch, FiFilter, FiMapPin, FiLayers, FiEye } from "react-icons/fi";
+import { isReadOnly } from "../utils/auth";
 
 const TRADE_OPTIONS = [
   "Armourer",
@@ -339,6 +340,22 @@ function Warehouses() {
       <Navbar />
       <div className="page-content">
 
+        {/* Read-only banner for superadmin */}
+        {isReadOnly() && (
+          <div className="alert" style={{
+            background: "rgba(245,158,11,0.1)",
+            border: "1px solid rgba(245,158,11,0.3)",
+            color: "#f59e0b",
+            marginBottom: "16px",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px"
+          }}>
+            <FiEye size={14} style={{ flexShrink: 0 }} />
+            <span>You are viewing as <strong>Super Admin</strong> — read-only mode. No changes can be made.</span>
+          </div>
+        )}
+
         {/* Header */}
         <div className="page-header">
           <div>
@@ -360,9 +377,8 @@ function Warehouses() {
         {/* TAB 1: WAREHOUSES LIST */}
         {activeTab === "warehouses" && (
           <>
-            {/* Action Bar */}
             <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "16px" }}>
-              {!showWhForm && !editWhId && (
+              {!isReadOnly() && !showWhForm && !editWhId && (
                 <button className="btn btn-primary btn-sm" onClick={() => { setShowWhForm(true); setMsg(""); }}>
                   <FiPlus size={14} /> Add Warehouse
                 </button>
@@ -370,7 +386,7 @@ function Warehouses() {
             </div>
 
             {/* Create Warehouse Form */}
-            {showWhForm && (
+            {showWhForm && !isReadOnly() && (
               <div className="card" style={{ marginBottom: "20px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", borderBottom: "1px solid var(--border)", paddingBottom: "10px" }}>
                   <span style={{ fontWeight: 700, fontSize: "15px", color: "var(--accent)", display: "flex", alignItems: "center", gap: "6px" }}>
@@ -469,7 +485,7 @@ function Warehouses() {
             )}
 
             {/* Edit Warehouse Form */}
-            {editWhId && (
+            {editWhId && !isReadOnly() && (
               <div id="wh-edit-form-container" className="card" style={{ marginBottom: "20px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", borderBottom: "1px solid var(--border)", paddingBottom: "10px" }}>
                   <span style={{ fontWeight: 700, fontSize: "15px", color: "var(--accent)" }}>
@@ -559,8 +575,8 @@ function Warehouses() {
                       <th>STATE</th>
                       <th>DISTRICT</th>
                       <th>ZONE</th>
-                      <th>CONTACT NUMBER</th>
-                      <th>ACTION</th>
+                      <th>CONTACT NO</th>
+                      {!isReadOnly() && <th>ACTIONS</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -575,40 +591,42 @@ function Warehouses() {
                           <td>{wh.district || "—"}</td>
                           <td><span className="badge badge-purple">{wh.zone || "—"}</span></td>
                           <td>{wh.contact_no || "—"}</td>
-                          <td>
-                            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                              <button
-                                style={{
-                                  border: "none", background: "none", cursor: "pointer", color: "#eab308", display: "flex", alignItems: "center"
-                                }}
-                                title="Edit"
-                                onClick={() => startEditWh(wh)}
-                              >
-                                <FiEdit2 size={15} />
-                              </button>
-                              {deleteConfirmWhId === wh.id ? (
-                                <span style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "12px", color: "var(--danger)" }}>
-                                  Sure?
-                                  <button className="btn-icon" style={{ color: "var(--danger)" }} onClick={() => deleteWarehouse(wh.id)}>
-                                    <FiCheck size={13} />
-                                  </button>
-                                  <button className="btn-icon" onClick={() => setDeleteConfirmWhId(null)}>
-                                    <FiX size={13} />
-                                  </button>
-                                </span>
-                              ) : (
+                          {!isReadOnly() && (
+                            <td>
+                              <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
                                 <button
                                   style={{
-                                    border: "none", background: "none", cursor: "pointer", color: "#ef4444", display: "flex", alignItems: "center"
+                                    border: "none", background: "none", cursor: "pointer", color: "#eab308", display: "flex", alignItems: "center"
                                   }}
-                                  title="Delete"
-                                  onClick={() => setDeleteConfirmWhId(wh.id)}
+                                  title="Edit"
+                                  onClick={() => startEditWh(wh)}
                                 >
-                                  <FiTrash2 size={15} />
+                                  <FiEdit2 size={15} />
                                 </button>
-                              )}
-                            </div>
-                          </td>
+                                {deleteConfirmWhId === wh.id ? (
+                                  <span style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "12px", color: "var(--danger)" }}>
+                                    Sure?
+                                    <button className="btn-icon" style={{ color: "var(--danger)" }} onClick={() => deleteWarehouse(wh.id)}>
+                                      <FiCheck size={13} />
+                                    </button>
+                                    <button className="btn-icon" onClick={() => setDeleteConfirmWhId(null)}>
+                                      <FiX size={13} />
+                                    </button>
+                                  </span>
+                                ) : (
+                                  <button
+                                    style={{
+                                      border: "none", background: "none", cursor: "pointer", color: "#ef4444", display: "flex", alignItems: "center"
+                                    }}
+                                    title="Delete"
+                                    onClick={() => setDeleteConfirmWhId(wh.id)}
+                                  >
+                                    <FiTrash2 size={15} />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          )}
                         </tr>
                       ))
                     )}
@@ -628,7 +646,7 @@ function Warehouses() {
                 <span style={{ fontWeight: 700, fontSize: "14px", color: "var(--text-primary)" }}>
                   🗺️ Mapping Filters & Actions
                 </span>
-                {!showMapForm && !editMapId && (
+                {!isReadOnly() && !showMapForm && !editMapId && (
                   <button className="btn btn-primary btn-sm" onClick={() => { setShowMapForm(true); setMsg(""); }}>
                     <FiPlus size={14} /> Add Mapping
                   </button>
@@ -689,7 +707,7 @@ function Warehouses() {
             </div>
 
             {/* Create Mapping Form */}
-            {showMapForm && (
+            {showMapForm && !isReadOnly() && (
               <div className="card" style={{ marginBottom: "20px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", borderBottom: "1px solid var(--border)", paddingBottom: "10px" }}>
                   <span style={{ fontWeight: 700, fontSize: "15px", color: "var(--accent)" }}>
@@ -751,7 +769,7 @@ function Warehouses() {
             )}
 
             {/* Edit Mapping Form */}
-            {editMapId && (
+            {editMapId && !isReadOnly() && (
               <div id="map-edit-form-container" className="card" style={{ marginBottom: "20px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", borderBottom: "1px solid var(--border)", paddingBottom: "10px" }}>
                   <span style={{ fontWeight: 700, fontSize: "15px", color: "var(--accent)" }}>
@@ -827,14 +845,14 @@ function Warehouses() {
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th style={{ width: "40px" }}><input type="checkbox" style={{ cursor: "pointer" }} /></th>
+                      {!isReadOnly() && <th style={{ width: "40px" }}><input type="checkbox" style={{ cursor: "pointer" }} /></th>}
                       <th>ZONE</th>
                       <th>STATE</th>
                       <th>DISTRICT</th>
                       <th>TRADE</th>
                       <th>TYPE</th>
                       <th>MAPPED WAREHOUSE</th>
-                      <th>ACTION</th>
+                      {!isReadOnly() && <th>ACTION</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -843,7 +861,7 @@ function Warehouses() {
                     ) : (
                       filteredMappings.map((m) => (
                         <tr id={`map-row-${m.id}`} key={m.id}>
-                          <td><input type="checkbox" style={{ cursor: "pointer" }} /></td>
+                          {!isReadOnly() && <td><input type="checkbox" style={{ cursor: "pointer" }} /></td>}
                           <td><span className="badge badge-purple">{m.zone || "—"}</span></td>
                           <td>{m.state}</td>
                           <td style={{ fontWeight: 600, color: "var(--text-primary)" }}>{m.district}</td>
@@ -856,40 +874,42 @@ function Warehouses() {
                               <span style={{ color: "var(--text-muted)", fontStyle: "italic" }}>— Unmapped —</span>
                             )}
                           </td>
-                          <td>
-                            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                              <button
-                                style={{
-                                  border: "none", background: "none", cursor: "pointer", color: "#eab308", display: "flex", alignItems: "center"
-                                }}
-                                title="Edit Mapping"
-                                onClick={() => startEditMap(m)}
-                              >
-                                <FiEdit2 size={15} />
-                              </button>
-                              {deleteConfirmMapId === m.id ? (
-                                <span style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "12px", color: "var(--danger)" }}>
-                                  Sure?
-                                  <button className="btn-icon" style={{ color: "var(--danger)" }} onClick={() => deleteMapping(m.id)}>
-                                    <FiCheck size={13} />
-                                  </button>
-                                  <button className="btn-icon" onClick={() => setDeleteConfirmMapId(null)}>
-                                    <FiX size={13} />
-                                  </button>
-                                </span>
-                              ) : (
+                          {!isReadOnly() && (
+                            <td>
+                              <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
                                 <button
                                   style={{
-                                    border: "none", background: "none", cursor: "pointer", color: "#ef4444", display: "flex", alignItems: "center"
+                                    border: "none", background: "none", cursor: "pointer", color: "#eab308", display: "flex", alignItems: "center"
                                   }}
-                                  title="Delete Mapping"
-                                  onClick={() => setDeleteConfirmMapId(m.id)}
+                                  title="Edit Mapping"
+                                  onClick={() => startEditMap(m)}
                                 >
-                                  <FiTrash2 size={15} />
+                                  <FiEdit2 size={15} />
                                 </button>
-                              )}
-                            </div>
-                          </td>
+                                {deleteConfirmMapId === m.id ? (
+                                  <span style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "12px", color: "var(--danger)" }}>
+                                    Sure?
+                                    <button className="btn-icon" style={{ color: "var(--danger)" }} onClick={() => deleteMapping(m.id)}>
+                                      <FiCheck size={13} />
+                                    </button>
+                                    <button className="btn-icon" onClick={() => setDeleteConfirmMapId(null)}>
+                                      <FiX size={13} />
+                                    </button>
+                                  </span>
+                                ) : (
+                                  <button
+                                    style={{
+                                      border: "none", background: "none", cursor: "pointer", color: "#ef4444", display: "flex", alignItems: "center"
+                                    }}
+                                    title="Delete Mapping"
+                                    onClick={() => setDeleteConfirmMapId(m.id)}
+                                  >
+                                    <FiTrash2 size={15} />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          )}
                         </tr>
                       ))
                     )}

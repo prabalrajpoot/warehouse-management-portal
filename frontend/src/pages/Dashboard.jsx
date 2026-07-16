@@ -4,12 +4,12 @@ import { Link, useLocation } from "react-router-dom";
 import api from "../api/api";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  ResponsiveContainer
+  ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area
 } from "recharts";
 import jsPDF from "jspdf";
 import * as XLSX from "xlsx";
 import { FiBox, FiCheckCircle, FiTruck, FiDownload, FiSun, FiMoon, FiBell, FiRotateCcw } from "react-icons/fi";
-import { isWarehouseManager, getWarehouseName } from "../utils/auth";
+import { isWarehouseManager, getWarehouseName, isReadOnly } from "../utils/auth";
 
 function Dashboard() {
   const [data, setData] = useState({
@@ -38,6 +38,8 @@ function Dashboard() {
   const [editingRowKey, setEditingRowKey] = useState(null);
   const [editVal, setEditVal] = useState("");
   const [theme, setTheme] = useState(localStorage.getItem("theme") || "light");
+  const [dashboardLoading, setDashboardLoading] = useState(true);
+  const [selectedOfferingMonth, setSelectedOfferingMonth] = useState("");
   const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
 
   // Dynamic filter state values
@@ -85,6 +87,7 @@ function Dashboard() {
 
   const fetchDashboard = async () => {
     try {
+      setDashboardLoading(true);
       const params = {};
       if (isWarehouseManager()) {
         params.warehouse = getWarehouseName();
@@ -99,8 +102,28 @@ function Dashboard() {
       setData(response.data);
     } catch (error) {
       console.log(error);
+    } finally {
+      setDashboardLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (reports.months && reports.months.length > 0 && !selectedOfferingMonth) {
+      setSelectedOfferingMonth(reports.months[reports.months.length - 1]);
+    }
+  }, [reports.months]);
+
+  const renderStatsSkeleton = () => (
+    <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "20px" }}>
+      {[1, 2, 3, 4].map(i => (
+        <div className="glass-card skeleton-loader" key={i} style={{ height: "135px", borderRadius: "var(--radius-lg)", border: "1px solid var(--border)" }} />
+      ))}
+    </div>
+  );
+
+  const renderChartSkeleton = () => (
+    <div className="glass-card skeleton-loader" style={{ height: "320px", borderRadius: "var(--radius-lg)", border: "1px solid var(--border)", marginTop: "24px" }} />
+  );
 
   const fetchReports = async () => {
     try {
@@ -248,10 +271,10 @@ function Dashboard() {
   };
 
   const stats = [
-    { label: "Kit Made", value: data.total_kits, icon: <FiBox size={18} />, color: "var(--accent)", bg: "var(--accent-soft)" },
-    { label: "Inspected Qty", value: data.total_inspected, icon: <FiCheckCircle size={18} />, color: "var(--success)", bg: "var(--success-soft)" },
-    { label: "Dispatched Qty", value: data.total_dispatched, icon: <FiTruck size={18} />, color: "var(--warning)", bg: "rgba(245,158,11,0.08)" },
-    { label: "Returned Qty", value: data.total_returned_qty || 0, icon: <FiRotateCcw size={18} />, color: "var(--danger)", bg: "var(--danger-soft)" }
+    { label: "Kit Made", value: data.total_kits, icon: <FiBox size={18} />, color: "var(--accent)", gradientClass: "gradient-icon-box" },
+    { label: "Inspected Qty", value: data.total_inspected, icon: <FiCheckCircle size={18} />, color: "var(--success)", gradientClass: "gradient-icon-box-success" },
+    { label: "Dispatched Qty", value: data.total_dispatched, icon: <FiTruck size={18} />, color: "var(--warning)", gradientClass: "gradient-icon-box-warning" },
+    { label: "Returned Qty", value: data.total_returned_qty || 0, icon: <FiRotateCcw size={18} />, color: "var(--danger)", gradientClass: "gradient-icon-box-danger" }
   ];
 
   const CustomTooltip = ({ active, payload, label }) => {
@@ -296,7 +319,14 @@ function Dashboard() {
   });
 
   const renderOfferingTable = () => {
-    if (reportsLoading) return <div className="card" style={{ padding: "40px", textAlign: "center" }}>⏳ Loading report data...</div>;
+    if (reportsLoading) {
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+          {renderStatsSkeleton()}
+          {renderChartSkeleton()}
+        </div>
+      );
+    }
     const { months, offering_report } = reports;
     if (!offering_report || offering_report.length === 0) return <div className="card" style={{ padding: "40px", textAlign: "center" }}>No offering records found in inspections database.</div>;
 
@@ -336,130 +366,224 @@ function Dashboard() {
       }
     });
 
+    // Calculate total offerings per trade for the selected month
+    const COLORS = ["#6366f1", "#10b981", "#fbbf24", "#ef4444", "#3b82f6", "#ec4899", "#8b5cf6", "#14b8a6", "#f97316"];
+    const pieData = (() => {
+      if (!filteredReport || !selectedOfferingMonth) return [];
+      const tradeMap = {};
+      filteredReport.forEach(row => {
+        const val = Number(row[selectedOfferingMonth]) || 0;
+        if (val > 0) {
+          tradeMap[row.trade] = (tradeMap[row.trade] || 0) + val;
+        }
+      });
+      return Object.entries(tradeMap).map(([name, value]) => ({ name, value }));
+    })();
+
+    const totalOfferedInMonth = pieData.reduce((acc, curr) => acc + curr.value, 0);
+
     return (
-      <div className="card" style={{ overflowX: "auto" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "16px" }}>
-          <div>
-            <h2 className="card-title" style={{ margin: 0 }}>Trade wise Month wise Offering</h2>
-            <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "4px" }}>Grouped kits offered for inspection bucketed by transaction date</p>
+      <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+        
+        {/* Trade Wise Month Wise Offering (Pie Chart + Month Summary) */}
+        {selectedOfferingMonth && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "24px" }}>
+            <div className="glass-card" style={{ padding: "20px 24px", borderRadius: "var(--radius-lg)" }}>
+              <div className="card-title" style={{ borderBottom: "none", marginBottom: "10px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+                <span>Trade-Wise Offering Breakdown</span>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", textTransform: "uppercase" }}>Month:</span>
+                  <select
+                    className="form-select"
+                    value={selectedOfferingMonth}
+                    onChange={(e) => setSelectedOfferingMonth(e.target.value)}
+                    style={{ padding: "2px 8px", height: "30px", fontSize: "12px", width: "110px", borderRadius: "6px" }}
+                  >
+                    {months.map(m => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              {pieData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={260}>
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={55}
+                      outerRadius={80}
+                      paddingAngle={3}
+                      dataKey="value"
+                    >
+                      {pieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => `${value.toLocaleString()} units`} />
+                    <Legend wrapperStyle={{ fontSize: "11px" }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div style={{ height: "260px", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)" }}>
+                  No offering data found for {selectedOfferingMonth}
+                </div>
+              )}
+            </div>
+            <div className="glass-card" style={{ padding: "20px 24px", borderRadius: "var(--radius-lg)", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+              <h3 style={{ fontSize: "16px", fontWeight: "700", marginBottom: "8px", color: "var(--text-primary)" }}>Monthly Kitting Offerings Summary</h3>
+              <p style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "16px" }}>
+                Total toolkit packages offered for quality inspection (QAA) in <strong>{selectedOfferingMonth}</strong>.
+              </p>
+              <div style={{ display: "flex", alignItems: "baseline", gap: "10px" }}>
+                <span style={{ fontSize: "40px", fontWeight: "800", color: "var(--accent)" }}>{totalOfferedInMonth.toLocaleString()}</span>
+                <span style={{ fontSize: "13px", fontWeight: "600", color: "var(--text-muted)" }}>units offered</span>
+              </div>
+              <div style={{ marginTop: "16px", borderTop: "1px solid var(--border)", paddingTop: "12px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                {pieData.slice(0, 4).map((d) => (
+                  <div key={d.name} style={{ display: "flex", flexDirection: "column" }}>
+                    <span style={{ fontSize: "11px", color: "var(--text-muted)", textTransform: "uppercase", fontWeight: "600" }}>{d.name}</span>
+                    <span style={{ fontSize: "14px", color: "var(--text-primary)", fontWeight: "700" }}>{d.value.toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
-          <button className="btn btn-ghost btn-sm" onClick={() => exportOfferingExcel(months, filteredReport)}>
-            <FiDownload size={13} /> Export Excel
-          </button>
-        </div>
+        )}
 
-        {/* Dynamic Card Filters Bar */}
-        <div style={{
-          display: "flex",
-          gap: "16px",
-          background: "var(--bg-elevated)",
-          padding: "12px 16px",
-          borderRadius: "8px",
-          border: "1px solid var(--border)",
-          marginBottom: "20px",
-          alignItems: "center",
-          flexWrap: "wrap"
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Filter Company:</span>
-            <select
-              className="form-select"
-              value={offeringCompanyFilter}
-              onChange={(e) => setOfferingCompanyFilter(e.target.value)}
-              style={{ padding: "4px 10px", height: "30px", fontSize: "12px", width: "130px" }}
-            >
-              <option value="All">All Companies</option>
-              <option value="PTL">PTL</option>
-              <option value="ITI">ITI</option>
-              <option value="VTL">VTL</option>
-            </select>
+        {/* Table Card */}
+        <div className="card" style={{ overflowX: "auto" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "16px" }}>
+            <div>
+              <h2 className="card-title" style={{ margin: 0, border: "none", padding: "0" }}>Trade wise Month wise Offering</h2>
+              <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "4px" }}>Grouped kits offered for inspection bucketed by transaction date</p>
+            </div>
+            <button className="btn btn-ghost btn-sm" onClick={() => exportOfferingExcel(months, filteredReport)}>
+              <FiDownload size={13} /> Export Excel
+            </button>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Filter Trade:</span>
-            <select
-              className="form-select"
-              value={offeringTradeFilter}
-              onChange={(e) => setOfferingTradeFilter(e.target.value)}
-              style={{ padding: "4px 10px", height: "30px", fontSize: "12px", width: "220px" }}
-            >
-              <option value="All">All Trades</option>
-              {Array.from(new Set(offering_report.map(r => r.trade))).map(t => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
-          </div>
-        </div>
+          {/* Filters Bar right above the table */}
+          <div style={{
+            display: "flex",
+            gap: "16px",
+            background: "var(--bg-elevated)",
+            padding: "12px 16px",
+            borderRadius: "12px",
+            border: "1px solid var(--border)",
+            marginBottom: "16px",
+            alignItems: "center",
+            flexWrap: "wrap"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Filter Company:</span>
+              <select
+                className="form-select"
+                value={offeringCompanyFilter}
+                onChange={(e) => setOfferingCompanyFilter(e.target.value)}
+                style={{ padding: "4px 10px", height: "32px", fontSize: "12px", width: "140px" }}
+              >
+                <option value="All">All Companies</option>
+                <option value="PTL">PTL</option>
+                <option value="ITI">ITI</option>
+                <option value="VTL">VTL</option>
+              </select>
+            </div>
 
-        <table className="data-table" style={{ fontSize: "12px" }}>
-          <thead>
-            <tr>
-              <th>Trade</th>
-              <th>Company</th>
-              <th style={{ textAlign: "right" }}>PO Qty</th>
-              <th style={{ textAlign: "right" }}>Advice Qty</th>
-              <th style={{ textAlign: "right" }}>Total Offered</th>
-              <th style={{ textAlign: "right" }}>Pending Demand</th>
-              {months.map(m => (
-                <th key={m} style={{ textAlign: "right" }}>{m}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filteredReport.map((row, idx) => (
-              <tr key={idx}>
-                <td style={{ fontWeight: 600, color: "var(--text-primary)" }}>{row.trade}</td>
-                <td><span className={`badge ${row.company === 'PTL' ? 'badge-purple' : row.company === 'ITI' ? 'badge-blue' : 'badge-green'}`}>{row.company}</span></td>
-                <td style={{ textAlign: "right" }}>{row.po_qty.toLocaleString()}</td>
-                <td style={{ textAlign: "right" }}>{row.advice_qty.toLocaleString()}</td>
-                <td style={{ textAlign: "right", fontWeight: 700 }}>{row.total_offered.toLocaleString()}</td>
-                <td style={{ textAlign: "right", color: row.pending_demand > 0 ? "var(--accent)" : "var(--text-secondary)" }}>{row.pending_demand.toLocaleString()}</td>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Filter Trade:</span>
+              <select
+                className="form-select"
+                value={offeringTradeFilter}
+                onChange={(e) => setOfferingTradeFilter(e.target.value)}
+                style={{ padding: "4px 10px", height: "32px", fontSize: "12px", width: "220px" }}
+              >
+                <option value="All">All Trades</option>
+                {Array.from(new Set(offering_report.map(r => r.trade))).map(t => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <table className="data-table" style={{ fontSize: "12px" }}>
+            <thead>
+              <tr>
+                <th>Trade</th>
+                <th>Company</th>
+                <th style={{ textAlign: "right" }}>PO Qty</th>
+                <th style={{ textAlign: "right" }}>Advice Qty</th>
+                <th style={{ textAlign: "right" }}>Total Offered</th>
+                <th style={{ textAlign: "right" }}>Pending Demand</th>
                 {months.map(m => (
-                  <td key={m} style={{ textAlign: "right", color: (row[m] || 0) > 0 ? "var(--text-primary)" : "var(--text-muted)" }}>
-                    {row[m] ? row[m].toLocaleString() : "0"}
-                  </td>
+                  <th key={m} style={{ textAlign: "right" }}>{m}</th>
                 ))}
               </tr>
-            ))}
-            {/* Total Row */}
-            <tr style={{ background: "rgba(0,0,0,0.02)", fontWeight: "bold", borderTop: "2px solid var(--border)" }}>
-              <td>Total</td>
-              <td>—</td>
-              <td style={{ textAlign: "right" }}>{totalRow.po_qty.toLocaleString()}</td>
-              <td style={{ textAlign: "right" }}>{totalRow.advice_qty.toLocaleString()}</td>
-              <td style={{ textAlign: "right" }}>{totalRow.total_offered.toLocaleString()}</td>
-              <td style={{ textAlign: "right" }}>{totalRow.pending_demand.toLocaleString()}</td>
-              {months.map(m => (
-                <td key={m} style={{ textAlign: "right" }}>{totalRow[m].toLocaleString()}</td>
+            </thead>
+            <tbody>
+              {filteredReport.map((row, idx) => (
+                <tr key={idx}>
+                  <td style={{ fontWeight: 600, color: "var(--text-primary)" }}>{row.trade}</td>
+                  <td><span className={`badge ${row.company === 'PTL' ? 'badge-purple' : row.company === 'ITI' ? 'badge-blue' : 'badge-green'}`}>{row.company}</span></td>
+                  <td style={{ textAlign: "right" }}>{row.po_qty.toLocaleString()}</td>
+                  <td style={{ textAlign: "right" }}>{row.advice_qty.toLocaleString()}</td>
+                  <td style={{ textAlign: "right", fontWeight: 700 }}>{row.total_offered.toLocaleString()}</td>
+                  <td style={{ textAlign: "right", color: row.pending_demand > 0 ? "var(--accent)" : "var(--text-secondary)" }}>{row.pending_demand.toLocaleString()}</td>
+                  {months.map(m => (
+                    <td key={m} style={{ textAlign: "right", color: (row[m] || 0) > 0 ? "var(--text-primary)" : "var(--text-muted)" }}>
+                      {row[m] ? row[m].toLocaleString() : "0"}
+                    </td>
+                  ))}
+                </tr>
               ))}
-            </tr>
-            {/* Trend Row */}
-            <tr style={{ background: "rgba(99, 102, 241, 0.04)", fontWeight: "bold" }}>
-              <td>Trend - Increasing</td>
-              <td>—</td>
-              <td style={{ textAlign: "right" }}>—</td>
-              <td style={{ textAlign: "right" }}>{totalRow.advice_qty.toLocaleString()}</td>
-              <td style={{ textAlign: "right" }}>{totalRow.total_offered.toLocaleString()}</td>
-              <td style={{ textAlign: "right" }}>—</td>
-              {months.map(m => {
-                const diff = trendRow[m];
-                const color = diff > 0 ? "#10b981" : diff < 0 ? "#ef4444" : "var(--text-muted)";
-                const arrow = diff > 0 ? "▲" : diff < 0 ? "▼" : "➡";
-                return (
-                  <td key={m} style={{ textAlign: "right", color }}>
-                    {arrow} {Math.abs(diff).toLocaleString()}
-                  </td>
-                );
-              })}
-            </tr>
-          </tbody>
-        </table>
+              {/* Total Row */}
+              <tr style={{ background: "rgba(0,0,0,0.02)", fontWeight: "bold", borderTop: "2px solid var(--border)" }}>
+                <td>Total</td>
+                <td>—</td>
+                <td style={{ textAlign: "right" }}>{totalRow.po_qty.toLocaleString()}</td>
+                <td style={{ textAlign: "right" }}>{totalRow.advice_qty.toLocaleString()}</td>
+                <td style={{ textAlign: "right" }}>{totalRow.total_offered.toLocaleString()}</td>
+                <td style={{ textAlign: "right" }}>{totalRow.pending_demand.toLocaleString()}</td>
+                {months.map(m => (
+                  <td key={m} style={{ textAlign: "right" }}>{totalRow[m].toLocaleString()}</td>
+                ))}
+              </tr>
+              {/* Trend Row */}
+              <tr style={{ background: "rgba(99, 102, 241, 0.04)", fontWeight: "bold" }}>
+                <td>Trend - Increasing</td>
+                <td>—</td>
+                <td style={{ textAlign: "right" }}>—</td>
+                <td style={{ textAlign: "right" }}>{totalRow.advice_qty.toLocaleString()}</td>
+                <td style={{ textAlign: "right" }}>{totalRow.total_offered.toLocaleString()}</td>
+                <td style={{ textAlign: "right" }}>—</td>
+                {months.map(m => {
+                  const diff = trendRow[m];
+                  const color = diff > 0 ? "#10b981" : diff < 0 ? "#ef4444" : "var(--text-muted)";
+                  const arrow = diff > 0 ? "▲" : diff < 0 ? "▼" : "➡";
+                  return (
+                    <td key={m} style={{ textAlign: "right", color }}>
+                      {arrow} {Math.abs(diff).toLocaleString()}
+                    </td>
+                  );
+                })}
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     );
   };
 
   const renderSummaryTable = () => {
-    if (reportsLoading) return <div className="card" style={{ padding: "40px", textAlign: "center" }}>⏳ Loading report data...</div>;
+    if (reportsLoading) {
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+          {renderStatsSkeleton()}
+          {renderChartSkeleton()}
+        </div>
+      );
+    }
     const { summary_report } = reports;
     if (!summary_report || summary_report.length === 0) return <div className="card" style={{ padding: "40px", textAlign: "center" }}>No summary records found in database.</div>;
 
@@ -516,10 +640,10 @@ function Dashboard() {
       return_qty: ptlTotal.return_qty + vtlTotal.return_qty + itiTotal.return_qty,
       pending_delivery: ptlTotal.pending_delivery + vtlTotal.pending_delivery + itiTotal.pending_delivery,
       payment_delivered: ptlTotal.payment_delivered + vtlTotal.payment_delivered + itiTotal.payment_delivered,
-      pending_dispatch_val: ptlTotal.pending_dispatch_val + vtlTotal.pending_dispatch_val + itiTotal.pending_dispatch_val,
+      pending_dispatch_val: ptlTotal.pending_dispatch_val + ptlTotal.pending_dispatch_val + itiTotal.pending_dispatch_val,
       pending_delivery_val: ptlTotal.pending_delivery_val + vtlTotal.pending_delivery_val + itiTotal.pending_delivery_val,
       return_val: ptlTotal.return_val + vtlTotal.return_val + itiTotal.return_val,
-      total_value: ptlTotal.total_value + vtlTotal.total_value + itiTotal.total_value
+      total_value: ptlTotal.total_value + ptlTotal.total_value + itiTotal.total_value
     };
 
     const renderGroupRows = (rows, groupLabel, groupTotal) => {
@@ -550,11 +674,12 @@ function Dashboard() {
                     position: "relative"
                   }}
                   onDoubleClick={() => {
+                    if (isReadOnly()) return;
                     if (row.trade === "Barber Set-B" || row.trade === "Boatmaker B") return;
                     setEditingRowKey(`${row.company}|${row.trade_cat}|${row.set_type}`);
                     setEditVal(row.delivery || 0);
                   }}
-                  title={(row.trade === "Barber Set-B" || row.trade === "Boatmaker B") ? "" : "Double-click to edit delivery quantity"}
+                  title={(isReadOnly() || row.trade === "Barber Set-B" || row.trade === "Boatmaker B") ? "" : "Double-click to edit delivery quantity"}
                 >
                   {editingRowKey === `${row.company}|${row.trade_cat}|${row.set_type}` ? (
                     <input
@@ -572,7 +697,7 @@ function Dashboard() {
                   ) : (
                     <>
                       {row.delivery ? row.delivery.toLocaleString() : "0"}
-                      {!(row.trade === "Barber Set-B" || row.trade === "Boatmaker B") && (
+                      {!isReadOnly() && !(row.trade === "Barber Set-B" || row.trade === "Boatmaker B") && (
                         <span style={{ fontSize: "8px", color: "var(--text-muted)", marginLeft: "4px", opacity: 0.6 }}>✏️</span>
                       )}
                     </>
@@ -616,87 +741,171 @@ function Dashboard() {
       );
     };
 
+    // Calculate Cumulative monthly summary values
+    const cumulativeData = (() => {
+      let cumulativeKits = 0;
+      let cumulativeInspected = 0;
+      let cumulativeDispatched = 0;
+      return (data.monthly_summary || []).map(item => {
+        cumulativeKits += item["Kits Made"] || 0;
+        cumulativeInspected += item["Inspected"] || 0;
+        cumulativeDispatched += item["Dispatched"] || 0;
+        return {
+          name: item.name,
+          "Kits Made": cumulativeKits,
+          "Inspected": cumulativeInspected,
+          "Dispatched": cumulativeDispatched
+        };
+      });
+    })();
+
     return (
-      <div className="card" style={{ overflowX: "auto" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "16px" }}>
-          <div>
-            <h2 className="card-title" style={{ margin: 0 }}>PMV Kits Cumulative Data & Value Summary</h2>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "6px" }}>
-              <span style={{ fontSize: "12px", color: "var(--text-secondary)", fontWeight: "600" }}>Select Date:</span>
-              <input
-                type="date"
-                value={reportDate}
-                onChange={(e) => setReportDate(e.target.value)}
-                style={{
-                  padding: "4px 8px",
-                  fontSize: "12px",
-                  borderRadius: "6px",
-                  border: "1px solid var(--border)",
-                  background: "var(--bg-elevated)",
-                  color: "var(--text-primary)",
-                  cursor: "pointer"
-                }}
-              />
+      <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+        
+        {/* Value Summary Cards Grid */}
+        <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "20px" }}>
+          <div className="glass-card interactive-stat-card" style={{ padding: "20px 22px", borderRadius: "var(--radius-lg)" }}>
+            <div className="stat-icon gradient-icon-box"><FiBox size={18} /></div>
+            <div className="stat-label">Grand Total Value</div>
+            <div className="stat-value" style={{ color: "var(--accent)", fontSize: "24px" }}>₹ {grandTotal.total_value.toLocaleString("en-IN")}</div>
+          </div>
+          <div className="glass-card interactive-stat-card" style={{ padding: "20px 22px", borderRadius: "var(--radius-lg)" }}>
+            <div className="stat-icon gradient-icon-box-success"><FiCheckCircle size={18} /></div>
+            <div className="stat-label">Delivered Value (100%)</div>
+            <div className="stat-value" style={{ color: "var(--success)", fontSize: "24px" }}>₹ {grandTotal.payment_delivered.toLocaleString("en-IN")}</div>
+          </div>
+          <div className="glass-card interactive-stat-card" style={{ padding: "20px 22px", borderRadius: "var(--radius-lg)" }}>
+            <div className="stat-icon gradient-icon-box-warning"><FiTruck size={18} /></div>
+            <div className="stat-label">Pipeline Value (30% + 70%)</div>
+            <div className="stat-value" style={{ color: "var(--warning)", fontSize: "24px" }}>₹ {(grandTotal.pending_dispatch_val + grandTotal.pending_delivery_val).toLocaleString("en-IN")}</div>
+            <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "8px", borderTop: "1px solid var(--border)", paddingTop: "6px", display: "flex", flexDirection: "column", gap: "2px" }}>
+              <span>30% Pend: ₹ {grandTotal.pending_dispatch_val.toLocaleString("en-IN")}</span>
+              <span>70% Transit: ₹ {grandTotal.pending_delivery_val.toLocaleString("en-IN")}</span>
             </div>
           </div>
-          <button className="btn btn-ghost btn-sm" onClick={() => exportSummaryExcel(summary_report)}>
-            <FiDownload size={13} /> Export Excel
-          </button>
+          <div className="glass-card interactive-stat-card" style={{ padding: "20px 22px", borderRadius: "var(--radius-lg)" }}>
+            <div className="stat-icon gradient-icon-box-danger"><FiRotateCcw size={18} /></div>
+            <div className="stat-label">Return Value</div>
+            <div className="stat-value" style={{ color: "var(--danger)", fontSize: "24px" }}>₹ {grandTotal.return_val.toLocaleString("en-IN")}</div>
+          </div>
         </div>
-        <table className="data-table" style={{ fontSize: "11px" }}>
-          <thead>
-            <tr>
-              <th style={{ width: "36px", textAlign: "center" }}>S.No.</th>
-              <th>Trade</th>
-              <th>Company</th>
-              <th style={{ textAlign: "right" }}>Total Kitting</th>
-              <th style={{ textAlign: "right" }}>{formattedDate} Kitting</th>
-              <th style={{ textAlign: "right" }}>Total Offering</th>
-              <th style={{ textAlign: "right" }}>{formattedDate} Offering</th>
-              <th style={{ textAlign: "right" }}>Total Inspected Cleared</th>
-              <th style={{ textAlign: "right" }}>{formattedDate} Inspected</th>
-              <th style={{ textAlign: "right" }}>Total Dispatch</th>
-              <th style={{ textAlign: "right" }}>{formattedDate} Dispatch</th>
-              <th style={{ textAlign: "right" }}>Delivery</th>
-              <th style={{ textAlign: "right" }}>Pending Dispatch</th>
-              <th style={{ textAlign: "right" }}>Return</th>
-              <th style={{ textAlign: "right" }}>Pending Delivery</th>
-              <th style={{ textAlign: "right" }}>Sale Rate</th>
-              <th style={{ textAlign: "right" }}>Payment Delivered</th>
-              <th style={{ textAlign: "right" }}>30% Pending Dispatch</th>
-              <th style={{ textAlign: "right" }}>70% Pending Delivery</th>
-              <th style={{ textAlign: "right" }}>Return Val</th>
-              <th style={{ textAlign: "right" }}>Total Value</th>
-            </tr>
-          </thead>
-          <tbody>
-            {renderGroupRows(ptlRows, "PTL", ptlTotal)}
-            {renderGroupRows(vtlRows, "VTL", vtlTotal)}
-            {renderGroupRows(itiRows, "ITI", itiTotal)}
-            <tr style={{ background: "rgba(139, 92, 246, 0.18)", fontWeight: "bold", borderTop: "2px solid var(--border)" }}>
-              <td style={{ textAlign: "center" }}>—</td>
-              <td colSpan={2} style={{ color: "var(--accent)" }}>Grand Total</td>
-              <td style={{ textAlign: "right" }}>{grandTotal.total_kitting.toLocaleString()}</td>
-              <td style={{ textAlign: "right" }}>{grandTotal.today_kitting.toLocaleString()}</td>
-              <td style={{ textAlign: "right" }}>{grandTotal.total_offering.toLocaleString()}</td>
-              <td style={{ textAlign: "right" }}>{grandTotal.today_offering.toLocaleString()}</td>
-              <td style={{ textAlign: "right" }}>{grandTotal.total_inspection_cleared.toLocaleString()}</td>
-              <td style={{ textAlign: "right" }}>{grandTotal.today_inspection_cleared.toLocaleString()}</td>
-              <td style={{ textAlign: "right" }}>{grandTotal.total_dispatch.toLocaleString()}</td>
-              <td style={{ textAlign: "right" }}>{grandTotal.today_dispatch.toLocaleString()}</td>
-              <td style={{ textAlign: "right" }}>{grandTotal.delivery.toLocaleString()}</td>
-              <td style={{ textAlign: "right" }}>{grandTotal.pending_dispatch.toLocaleString()}</td>
-              <td style={{ textAlign: "right" }}>{grandTotal.return_qty.toLocaleString()}</td>
-              <td style={{ textAlign: "right" }}>{grandTotal.pending_delivery.toLocaleString()}</td>
-              <td style={{ textAlign: "right" }}>—</td>
-              <td style={{ textAlign: "right" }}>{grandTotal.payment_delivered.toLocaleString()}</td>
-              <td style={{ textAlign: "right" }}>{grandTotal.pending_dispatch_val.toLocaleString()}</td>
-              <td style={{ textAlign: "right" }}>{grandTotal.pending_delivery_val.toLocaleString()}</td>
-              <td style={{ textAlign: "right" }}>{grandTotal.return_val.toLocaleString()}</td>
-              <td style={{ textAlign: "right" }}>{grandTotal.total_value.toLocaleString()}</td>
-            </tr>
-          </tbody>
-        </table>
+
+        {/* Cumulative Area Chart */}
+        {cumulativeData.length > 0 && (
+          <div className="glass-card" style={{ padding: "24px", borderRadius: "var(--radius-lg)" }}>
+            <div className="card-title" style={{ borderBottom: "none", marginBottom: "16px" }}>Kitting Operations Cumulative Growth Trend</div>
+            <ResponsiveContainer width="100%" height={280}>
+              <AreaChart data={cumulativeData}>
+                <defs>
+                  <linearGradient id="colorAccent" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.35}/>
+                    <stop offset="95%" stopColor="var(--accent)" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="colorSuccess" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--success)" stopOpacity={0.35}/>
+                    <stop offset="95%" stopColor="var(--success)" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="colorWarning" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--warning)" stopOpacity={0.35}/>
+                    <stop offset="95%" stopColor="var(--warning)" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="name" tick={{ fill: "var(--text-secondary)", fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "var(--text-secondary)", fontSize: 11 }} axisLine={false} tickLine={false} />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend formatter={(value) => <span style={{ color: "var(--text-secondary)", fontSize: 12 }}>{value}</span>} />
+                <Area type="monotone" dataKey="Kits Made" stroke="var(--accent)" strokeWidth={2} fillOpacity={1} fill="url(#colorAccent)" />
+                <Area type="monotone" dataKey="Inspected" stroke="var(--success)" strokeWidth={2} fillOpacity={1} fill="url(#colorSuccess)" />
+                <Area type="monotone" dataKey="Dispatched" stroke="var(--warning)" strokeWidth={2} fillOpacity={1} fill="url(#colorWarning)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* PMV Table Card */}
+        <div className="card" style={{ overflowX: "auto" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "16px" }}>
+            <div>
+              <h2 className="card-title" style={{ margin: 0, border: "none", padding: "0" }}>PMV Kits Cumulative Data & Value Summary</h2>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "6px" }}>
+                <span style={{ fontSize: "12px", color: "var(--text-secondary)", fontWeight: "600" }}>Select Date:</span>
+                <input
+                  type="date"
+                  value={reportDate}
+                  onChange={(e) => setReportDate(e.target.value)}
+                  style={{
+                    padding: "4px 8px",
+                    fontSize: "12px",
+                    borderRadius: "6px",
+                    border: "1px solid var(--border)",
+                    background: "var(--bg-elevated)",
+                    color: "var(--text-primary)",
+                    cursor: "pointer",
+                    height: "30px"
+                  }}
+                />
+              </div>
+            </div>
+            <button className="btn btn-ghost btn-sm" onClick={() => exportSummaryExcel(summary_report)}>
+              <FiDownload size={13} /> Export Excel
+            </button>
+          </div>
+          <table className="data-table" style={{ fontSize: "11px" }}>
+            <thead>
+              <tr>
+                <th style={{ width: "36px", textAlign: "center" }}>S.No.</th>
+                <th>Trade</th>
+                <th>Company</th>
+                <th style={{ textAlign: "right" }}>Total Kitting</th>
+                <th style={{ textAlign: "right" }}>{formattedDate} Kitting</th>
+                <th style={{ textAlign: "right" }}>Total Offering</th>
+                <th style={{ textAlign: "right" }}>{formattedDate} Offering</th>
+                <th style={{ textAlign: "right" }}>Total Inspected Cleared</th>
+                <th style={{ textAlign: "right" }}>{formattedDate} Inspected</th>
+                <th style={{ textAlign: "right" }}>Total Dispatch</th>
+                <th style={{ textAlign: "right" }}>{formattedDate} Dispatch</th>
+                <th style={{ textAlign: "right" }}>Delivery</th>
+                <th style={{ textAlign: "right" }}>Pending Dispatch</th>
+                <th style={{ textAlign: "right" }}>Return</th>
+                <th style={{ textAlign: "right" }}>Pending Delivery</th>
+                <th style={{ textAlign: "right" }}>Sale Rate</th>
+                <th style={{ textAlign: "right" }}>Payment Delivered</th>
+                <th style={{ textAlign: "right" }}>30% Pending Dispatch</th>
+                <th style={{ textAlign: "right" }}>70% Pending Delivery</th>
+                <th style={{ textAlign: "right" }}>Return Val</th>
+                <th style={{ textAlign: "right" }}>Total Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {renderGroupRows(ptlRows, "PTL", ptlTotal)}
+              {renderGroupRows(vtlRows, "VTL", vtlTotal)}
+              {renderGroupRows(itiRows, "ITI", itiTotal)}
+              <tr style={{ background: "rgba(139, 92, 246, 0.18)", fontWeight: "bold", borderTop: "2px solid var(--border)" }}>
+                <td style={{ textAlign: "center" }}>—</td>
+                <td colSpan={2} style={{ color: "var(--accent)" }}>Grand Total</td>
+                <td style={{ textAlign: "right" }}>{grandTotal.total_kitting.toLocaleString()}</td>
+                <td style={{ textAlign: "right" }}>{grandTotal.today_kitting.toLocaleString()}</td>
+                <td style={{ textAlign: "right" }}>{grandTotal.total_offering.toLocaleString()}</td>
+                <td style={{ textAlign: "right" }}>{grandTotal.today_offering.toLocaleString()}</td>
+                <td style={{ textAlign: "right" }}>{grandTotal.total_inspection_cleared.toLocaleString()}</td>
+                <td style={{ textAlign: "right" }}>{grandTotal.today_inspection_cleared.toLocaleString()}</td>
+                <td style={{ textAlign: "right" }}>{grandTotal.total_dispatch.toLocaleString()}</td>
+                <td style={{ textAlign: "right" }}>{grandTotal.today_dispatch.toLocaleString()}</td>
+                <td style={{ textAlign: "right" }}>{grandTotal.delivery.toLocaleString()}</td>
+                <td style={{ textAlign: "right" }}>{grandTotal.pending_dispatch.toLocaleString()}</td>
+                <td style={{ textAlign: "right" }}>{grandTotal.return_qty.toLocaleString()}</td>
+                <td style={{ textAlign: "right" }}>{grandTotal.pending_delivery.toLocaleString()}</td>
+                <td style={{ textAlign: "right" }}>—</td>
+                <td style={{ textAlign: "right" }}>{grandTotal.payment_delivered.toLocaleString()}</td>
+                <td style={{ textAlign: "right" }}>{grandTotal.pending_dispatch_val.toLocaleString()}</td>
+                <td style={{ textAlign: "right" }}>{grandTotal.pending_delivery_val.toLocaleString()}</td>
+                <td style={{ textAlign: "right" }}>{grandTotal.return_val.toLocaleString()}</td>
+                <td style={{ textAlign: "right" }}>{grandTotal.total_value.toLocaleString()}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     );
   };
@@ -928,99 +1137,87 @@ function Dashboard() {
         )}
 
         {/* Tab Content */}
-        {activeDashboardTab === "overview" && (
+        {dashboardLoading ? (
           <>
-            {/* Workflow Stats cards (4 Columns) */}
-            <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "20px" }}>
-              {stats.map((s) => (
-                <div className="glass-card interactive-stat-card" key={s.label} style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "20px 22px", borderRadius: "var(--radius-lg)" }}>
-                  <div>
-                    <div className="stat-icon" style={{ background: s.bg, color: s.color }}>
-                      {s.icon}
-                    </div>
-                    <div className="stat-label">{s.label}</div>
-                    <div className="stat-value" style={{ color: s.color }}>{s.value}</div>
-                  </div>
-                  {s.label === "Inspected Qty" && (
-                    <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "8px", borderTop: "1px solid var(--border)", paddingTop: "6px", display: "flex", flexWrap: "wrap", gap: "10px" }}>
-                      <span style={{ color: "var(--success)", fontWeight: 600 }}>✔ Pass: {data.inspected_passed}</span>
-                      <span style={{ color: "var(--danger)", fontWeight: 600 }}>✘ Fail: {data.inspected_failed}</span>
-                      <span style={{ color: "var(--accent)", fontWeight: 600 }}>⏳ Pend: {data.inspected_pending || 0}</span>
-                    </div>
-                  )}
-                  {s.label === "Dispatched Qty" && (
-                    <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "8px", borderTop: "1px solid var(--border)", paddingTop: "6px", display: "flex", flexDirection: "column", gap: "4px" }}>
-                      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                        <span style={{ color: "var(--warning)", fontWeight: 600 }}>📦 Pend: {data.dispatch_pending_mark || 0}</span>
-                        <span style={{ color: "var(--accent)", fontWeight: 600 }}>🚚 Transit: {data.dispatch_in_transit || 0}</span>
-                        <span style={{ color: "var(--success)", fontWeight: 600 }}>✅ Sent: {data.dispatch_dispatched || 0}</span>
+            {renderStatsSkeleton()}
+            {renderChartSkeleton()}
+          </>
+        ) : (
+          activeDashboardTab === "overview" && (
+            <>
+              {/* Workflow Stats cards (4 Columns) */}
+              <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "20px" }}>
+                {stats.map((s) => (
+                  <div className="glass-card interactive-stat-card" key={s.label} style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "20px 22px", borderRadius: "var(--radius-lg)" }}>
+                    <div>
+                      <div className={`stat-icon ${s.gradientClass}`}>
+                        {s.icon}
                       </div>
+                      <div className="stat-label">{s.label}</div>
+                      <div className="stat-value" style={{ color: s.color }}>{s.value}</div>
                     </div>
-                  )}
-                  {s.label === "Returned Qty" && (
-                    <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "8px", borderTop: "1px solid var(--border)", paddingTop: "6px" }}>
-                      <span style={{ color: "var(--danger)", fontWeight: 600 }}>🔄 Count: {data.total_returned || 0} lots</span>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* Low Stock Alerts */}
-            {data.low_stock_items && data.low_stock_items.length > 0 && (
-              <div className="card" style={{ marginTop: "24px", borderColor: "rgba(239, 68, 68, 0.2)", background: "rgba(239, 68, 68, 0.02)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--danger)", fontWeight: 700, fontSize: "13px", marginBottom: "12px" }}>
-                  ⚠️ Low Stock Alert (Items under 50 units)
-                </div>
-                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                  {data.low_stock_items.map((item) => (
-                    <div
-                      key={item.item_name}
-                      style={{
-                        background: "var(--bg-surface)",
-                        border: "1px solid var(--border)",
-                        borderRadius: "6px",
-                        padding: "8px 12px",
-                        fontSize: "12px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        boxShadow: "0 1px 3px rgba(0,0,0,0.02)"
-                      }}
-                    >
-                      <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{item.item_name}</span>
-                      <span className="badge badge-red" style={{ fontWeight: "700", padding: "2px 6px" }}>
-                        {item.stock} left
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                    {s.label === "Inspected Qty" && (
+                      <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "8px", borderTop: "1px solid var(--border)", paddingTop: "6px", display: "flex", flexWrap: "wrap", gap: "10px" }}>
+                        <span style={{ color: "var(--success)", fontWeight: 600 }}>✔ Pass: {data.inspected_passed}</span>
+                        <span style={{ color: "var(--danger)", fontWeight: 600 }}>✘ Fail: {data.inspected_failed}</span>
+                        <span style={{ color: "var(--accent)", fontWeight: 600 }}>⏳ Pend: {data.inspected_pending || 0}</span>
+                      </div>
+                    )}
+                    {s.label === "Dispatched Qty" && (
+                      <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "8px", borderTop: "1px solid var(--border)", paddingTop: "6px", display: "flex", flexDirection: "column", gap: "4px" }}>
+                        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                          <span style={{ color: "var(--warning)", fontWeight: 600 }}>📦 Pend: {data.dispatch_pending_mark || 0}</span>
+                          <span style={{ color: "var(--accent)", fontWeight: 600 }}>🚚 Transit: {data.dispatch_in_transit || 0}</span>
+                          <span style={{ color: "var(--success)", fontWeight: 600 }}>✅ Sent: {data.dispatch_dispatched || 0}</span>
+                        </div>
+                      </div>
+                    )}
+                    {s.label === "Returned Qty" && (
+                      <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "8px", borderTop: "1px solid var(--border)", paddingTop: "6px" }}>
+                        <span style={{ color: "var(--danger)", fontWeight: 600 }}>🔄 Count: {data.total_returned || 0} lots</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
-            )}
 
-            {/* Monthly Summary Chart (Full Width) */}
-            <div className="glass-card" style={{ padding: "24px", borderRadius: "var(--radius-lg)", marginTop: "24px" }}>
-              <div className="card-title">Monthly Summary - Kits Made vs Inspected vs Dispatched</div>
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={data.monthly_summary || []}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="name" tick={{ fill: "var(--text-secondary)", fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: "var(--text-secondary)", fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Legend formatter={(value) => <span style={{ color: "var(--text-secondary)", fontSize: 12 }}>{value}</span>} />
-                  <Bar dataKey="Kits Made" fill="var(--accent)" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Inspected" fill="var(--success)" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Dispatched" fill="var(--warning)" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+              {/* Low Stock Alerts */}
+              {data.low_stock_items && data.low_stock_items.length > 0 && (
+                <div className="card" style={{ marginTop: "24px", borderColor: "rgba(239, 68, 68, 0.2)", background: "rgba(239, 68, 68, 0.02)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--danger)", fontWeight: 700, fontSize: "13px", marginBottom: "12px" }}>
+                    ⚠️ Low Stock Alert (Items under 50 units)
+                  </div>
+                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                    {data.low_stock_items.map((item) => (
+                      <div
+                        key={item.item_name}
+                        style={{
+                          background: "var(--bg-surface)",
+                          border: "1px solid var(--border)",
+                          borderRadius: "6px",
+                          padding: "8px 12px",
+                          fontSize: "12px",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          boxShadow: "0 1px 3px rgba(0,0,0,0.02)"
+                        }}
+                      >
+                        <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{item.item_name}</span>
+                        <span className="badge badge-red" style={{ fontWeight: "700", padding: "2px 6px" }}>
+                          {item.stock} left
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-            {/* Bottom charts row */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px", marginTop: "24px" }}>
-              <div className="glass-card" style={{ padding: "24px", borderRadius: "var(--radius-lg)" }}>
-                <div className="card-title">Yearly Summary</div>
-                <ResponsiveContainer width="100%" height={260}>
-                  <BarChart data={data.yearly_summary || []}>
+              {/* Monthly Summary Chart (Full Width) */}
+              <div className="glass-card" style={{ padding: "24px", borderRadius: "var(--radius-lg)", marginTop: "24px" }}>
+                <div className="card-title">Monthly Summary - Kits Made vs Inspected vs Dispatched</div>
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart data={data.monthly_summary || []}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                     <XAxis dataKey="name" tick={{ fill: "var(--text-secondary)", fontSize: 11 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fill: "var(--text-secondary)", fontSize: 11 }} axisLine={false} tickLine={false} />
@@ -1033,22 +1230,41 @@ function Dashboard() {
                 </ResponsiveContainer>
               </div>
 
-              <div className="glass-card" style={{ padding: "24px", borderRadius: "var(--radius-lg)" }}>
-                <div className="card-title">Warehouse Location Wise Summary</div>
-                <ResponsiveContainer width="100%" height={260}>
-                  <BarChart data={data.location_summary || []}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                    <XAxis dataKey="name" tick={{ fill: "var(--text-secondary)", fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill: "var(--text-secondary)", fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend formatter={(value) => <span style={{ color: "var(--text-secondary)", fontSize: 12 }}>{value}</span>} />
-                    <Bar dataKey="Kits Made" fill="var(--accent)" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="Dispatched" fill="var(--warning)" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+              {/* Bottom charts row */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px", marginTop: "24px" }}>
+                <div className="glass-card" style={{ padding: "24px", borderRadius: "var(--radius-lg)" }}>
+                  <div className="card-title">Yearly Summary</div>
+                  <ResponsiveContainer width="100%" height={260}>
+                    <BarChart data={data.yearly_summary || []}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                      <XAxis dataKey="name" tick={{ fill: "var(--text-secondary)", fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fill: "var(--text-secondary)", fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend formatter={(value) => <span style={{ color: "var(--text-secondary)", fontSize: 12 }}>{value}</span>} />
+                      <Bar dataKey="Kits Made" fill="var(--accent)" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="Inspected" fill="var(--success)" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="Dispatched" fill="var(--warning)" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                <div className="glass-card" style={{ padding: "24px", borderRadius: "var(--radius-lg)" }}>
+                  <div className="card-title">Warehouse Location Wise Summary</div>
+                  <ResponsiveContainer width="100%" height={260}>
+                    <BarChart data={data.location_summary || []}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                      <XAxis dataKey="name" tick={{ fill: "var(--text-secondary)", fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fill: "var(--text-secondary)", fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend formatter={(value) => <span style={{ color: "var(--text-secondary)", fontSize: 12 }}>{value}</span>} />
+                      <Bar dataKey="Kits Made" fill="var(--accent)" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="Dispatched" fill="var(--warning)" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
-            </div>
-          </>
+            </>
+          )
         )}
 
         {activeDashboardTab === "offering" && renderOfferingTable()}

@@ -29,6 +29,14 @@ export function isReadOnly() {
 }
 
 /**
+ * Returns true if the current user is permitted to delete records.
+ * Only 'admin' role has delete permissions.
+ */
+export function canDelete() {
+  return getRole() === "admin";
+}
+
+/**
  * For warehouse managers: filter an array of records to only their warehouse.
  * For all other roles: return the full array unfiltered.
  */

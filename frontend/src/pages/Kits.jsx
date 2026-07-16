@@ -4,7 +4,7 @@ import api from "../api/api";
 import { FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch, FiDownload, FiUpload } from "react-icons/fi";
 import jsPDF from "jspdf";
 import * as XLSX from "xlsx";
-import { isReadOnly, isWarehouseManager, filterByWarehouse, getWarehouseName } from "../utils/auth";
+import { isReadOnly, isWarehouseManager, filterByWarehouse, getWarehouseName, canDelete } from "../utils/auth";
 
 const FIRM_OPTIONS = ["ITI", "PTL", "VTL"];
 
@@ -179,6 +179,16 @@ function Kits() {
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    if (isWarehouseManager()) {
+      const proceed = window.confirm(
+        "⚠️ Attention: Please ensure that all entries in your Excel file are valid and correct before uploading. As a Warehouse Manager, you will not have permission to delete entries once they are imported. Do you want to proceed with the upload?"
+      );
+      if (!proceed) {
+        e.target.value = "";
+        return;
+      }
+    }
 
     const reader = new FileReader();
     reader.onload = async (evt) => {
@@ -724,14 +734,14 @@ function Kits() {
             <span style={{ fontWeight: 600, color: "var(--text-primary)", fontSize: "14px" }}>Kits Production Records ({filtered.length})</span>
             <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
               {!isReadOnly() && selectedIds.length > 0 && (
-                <>
-                  <button className="btn btn-primary btn-sm" onClick={offerSelectedForInspection} style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                    📋 Offer Selected ({selectedIds.length})
-                  </button>
-                  <button className="btn btn-danger btn-sm" onClick={deleteSelected}>
-                    <FiTrash2 size={13} /> Delete Selected ({selectedIds.length})
-                  </button>
-                </>
+                <button className="btn btn-primary btn-sm" onClick={offerSelectedForInspection} style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                  📋 Offer Selected ({selectedIds.length})
+                </button>
+              )}
+              {!isReadOnly() && canDelete() && selectedIds.length > 0 && (
+                <button className="btn btn-danger btn-sm" onClick={deleteSelected}>
+                  <FiTrash2 size={13} /> Delete Selected ({selectedIds.length})
+                </button>
               )}
               {hasActiveFilters && (
                 <button className="btn btn-ghost btn-sm" onClick={clearFilters} style={{ color: "var(--danger)", borderColor: "var(--danger)" }}>
@@ -861,7 +871,7 @@ function Kits() {
                               <FiEdit2 size={13} />
                             </button>
                           )}
-                          {!isReadOnly() && (deleteConfirmId === item.id ? (
+                          {!isReadOnly() && canDelete() && (deleteConfirmId === item.id ? (
                             <span style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "12px", color: "var(--danger)" }}>
                               Sure?
                               <button className="btn-icon" style={{ color: "var(--danger)" }} onClick={() => deleteKit(item.id)}>

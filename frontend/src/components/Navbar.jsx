@@ -73,6 +73,21 @@ function Navbar() {
     setTheme(prev => prev === "light" ? "dark" : "light");
   };
 
+  useEffect(() => {
+    const restoreScroll = () => {
+      const scrollPos = localStorage.getItem("sidebarScrollPos");
+      if (scrollPos) {
+        const container = document.getElementById("sidebar-scroll-container");
+        if (container) {
+          container.scrollTop = parseInt(scrollPos, 10);
+        }
+      }
+    };
+    restoreScroll();
+    const timer = setTimeout(restoreScroll, 50);
+    return () => clearTimeout(timer);
+  }, []);
+
   const isActive = (path) => {
     if (path.includes("?")) {
       return location.pathname + location.search === path;
@@ -142,7 +157,13 @@ function Navbar() {
   return (
     <div style={sidebarStyle}>
 
-      <div style={{ display: "flex", flexDirection: "column", flex: 1, overflowY: "auto" }}>
+      <div
+        id="sidebar-scroll-container"
+        onScroll={(e) => {
+          localStorage.setItem("sidebarScrollPos", e.currentTarget.scrollTop);
+        }}
+        style={{ display: "flex", flexDirection: "column", flex: 1, overflowY: "auto" }}
+      >
         {/* Logo */}
         <div style={{
           padding: "28px 20px 16px",

@@ -11,7 +11,7 @@ def log_activity(db: Session, username: str, role: str, action: str, module: str
             action=action,
             module=module,
             details=details,
-            timestamp=datetime.datetime.now()
+            timestamp=datetime.datetime.now(datetime.timezone.utc)
         )
         db.add(log_entry)
         db.commit()

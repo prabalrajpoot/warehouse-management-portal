@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
 import api from "../api/api";
-import { FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch } from "react-icons/fi";
+import { FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch, FiEye } from "react-icons/fi";
+import { isReadOnly } from "../utils/auth";
 
 const FIRM_OPTIONS = ["ITI", "PTL", "VTL"];
 
@@ -240,14 +241,32 @@ function SampleInspection() {
       <Navbar />
       <div className="page-content">
 
+        {/* Read-only banner for superadmin */}
+        {isReadOnly() && (
+          <div className="alert" style={{
+            background: "rgba(245,158,11,0.1)",
+            border: "1px solid rgba(245,158,11,0.3)",
+            color: "#f59e0b",
+            marginBottom: "16px",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px"
+          }}>
+            <FiEye size={14} style={{ flexShrink: 0 }} />
+            <span>You are viewing as <strong>Super Admin</strong> — read-only mode. No changes can be made.</span>
+          </div>
+        )}
+
         <div className="page-header">
           <div>
             <h1 className="page-title">Sample Inspection Log</h1>
             <p className="page-subtitle">Track quality inspections of toolkit samples before final dispatch approval</p>
           </div>
-          <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setEditId(null); setMsg(""); }}>
-            <FiPlus size={14} /> {showForm ? "Cancel" : "Add Sample Log"}
-          </button>
+          {!isReadOnly() && (
+            <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setEditId(null); setMsg(""); }}>
+              <FiPlus size={14} /> {showForm ? "Cancel" : "Add Sample Log"}
+            </button>
+          )}
         </div>
 
         {/* Tabs */}
@@ -261,7 +280,7 @@ function SampleInspection() {
         </div>
 
         {/* New entry form */}
-        {showForm && (
+        {showForm && !isReadOnly() && (
           <div className="card" style={{ marginBottom: "20px" }}>
             <div className="card-title">New Sample Inspection Entry</div>
             <div className="form-grid" style={{ marginBottom: "16px" }}>
@@ -317,7 +336,7 @@ function SampleInspection() {
         )}
 
         {/* Edit form card */}
-        {editId && (
+        {editId && !isReadOnly() && (
           <div id="sample-edit-form-container" className="card" style={{ marginBottom: "20px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", borderBottom: "1px solid var(--border)", paddingBottom: "10px" }}>
               <span style={{ fontWeight: 700, fontSize: "15px", color: "var(--accent)" }}>
@@ -410,7 +429,7 @@ function SampleInspection() {
                   <th>QTY</th>
                   <th>STATUS</th>
                   <th>REMARKS</th>
-                  <th>ACTIONS</th>
+                  {!isReadOnly() && <th>ACTIONS</th>}
                 </tr>
               </thead>
               <tbody>
@@ -436,20 +455,22 @@ function SampleInspection() {
                         </span>
                       </td>
                       <td>{item.remarks || "—"}</td>
-                      <td>
-                        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                          <button className="btn-icon" title="Edit" onClick={() => startEdit(item)}><FiEdit2 size={13} /></button>
-                          {deleteConfirmId === item.id ? (
-                            <span style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "12px", color: "var(--danger)" }}>
-                              Sure?
-                              <button className="btn-icon" style={{ color: "var(--danger)" }} onClick={() => handleDelete(item.id)}><FiCheck size={13} /></button>
-                              <button className="btn-icon" onClick={() => setDeleteConfirmId(null)}><FiX size={13} /></button>
-                            </span>
-                          ) : (
-                            <button className="btn-icon" title="Delete" style={{ color: "var(--danger)" }} onClick={() => { setDeleteConfirmId(item.id); setEditId(null); }}><FiTrash2 size={13} /></button>
-                          )}
-                        </div>
-                      </td>
+                      {!isReadOnly() && (
+                        <td>
+                          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                            <button className="btn-icon" title="Edit" onClick={() => startEdit(item)}><FiEdit2 size={13} /></button>
+                            {deleteConfirmId === item.id ? (
+                              <span style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "12px", color: "var(--danger)" }}>
+                                Sure?
+                                <button className="btn-icon" style={{ color: "var(--danger)" }} onClick={() => handleDelete(item.id)}><FiCheck size={13} /></button>
+                                <button className="btn-icon" onClick={() => setDeleteConfirmId(null)}><FiX size={13} /></button>
+                              </span>
+                            ) : (
+                              <button className="btn-icon" title="Delete" style={{ color: "var(--danger)" }} onClick={() => { setDeleteConfirmId(item.id); setEditId(null); }}><FiTrash2 size={13} /></button>
+                            )}
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}

@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
 import api from "../api/api";
-import { FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch, FiDownload, FiUpload } from "react-icons/fi";
+import { FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch, FiDownload, FiUpload, FiEye } from "react-icons/fi";
 import jsPDF from "jspdf";
 import * as XLSX from "xlsx";
-import { isReadOnly, filterByWarehouse, isWarehouseManager, getWarehouseName } from "../utils/auth";
+import { isReadOnly, filterByWarehouse, isWarehouseManager, getWarehouseName, canDelete } from "../utils/auth";
 
 const FIRM_OPTIONS = ["ITI", "PTL", "VTL"];
 
@@ -189,6 +189,16 @@ function Inspection() {
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    if (isWarehouseManager()) {
+      const proceed = window.confirm(
+        "⚠️ Attention: Please ensure that all entries in your Excel file are valid and correct before uploading. As a Warehouse Manager, you will not have permission to delete entries once they are imported. Do you want to proceed with the upload?"
+      );
+      if (!proceed) {
+        e.target.value = "";
+        return;
+      }
+    }
 
     const reader = new FileReader();
     reader.onload = async (evt) => {
@@ -622,6 +632,22 @@ function Inspection() {
       <Navbar />
       <div className="page-content">
 
+        {/* Read-only banner for superadmin */}
+        {isReadOnly() && (
+          <div className="alert" style={{
+            background: "rgba(245,158,11,0.1)",
+            border: "1px solid rgba(245,158,11,0.3)",
+            color: "#f59e0b",
+            marginBottom: "16px",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px"
+          }}>
+            <FiEye size={14} style={{ flexShrink: 0 }} />
+            <span>You are viewing as <strong>Super Admin</strong> — read-only mode. No changes can be made.</span>
+          </div>
+        )}
+
         {/* Header */}
         <div className="page-header">
           <div>
@@ -967,14 +993,16 @@ function Inspection() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th style={{ width: "40px" }}>
-                    <input
-                      type="checkbox"
-                      checked={isAllSelected}
-                      onChange={toggleSelectAll}
-                      style={{ cursor: "pointer" }}
-                    />
-                  </th>
+                  {!isReadOnly() && (
+                    <th style={{ width: "40px" }}>
+                      <input
+                        type="checkbox"
+                        checked={isAllSelected}
+                        onChange={toggleSelectAll}
+                        style={{ cursor: "pointer" }}
+                      />
+                    </th>
+                  )}
                   <th>#</th>
                   <th>Call Date</th>
                   <th>Firm</th>
@@ -985,7 +1013,7 @@ function Inspection() {
                   <th>Ins. Passed Date</th>
                   <th>Result</th>
                   <th>Inspected Quantity</th>
-                  <th>Actions</th>
+                  {!isReadOnly() && <th>Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -994,14 +1022,16 @@ function Inspection() {
                 ) : (
                   paginated.map((item, i) => (
                     <tr id={`inspection-row-${item.id}`} key={item.id} style={{ background: selectedIds.includes(item.id) ? "var(--bg-elevated)" : "transparent" }}>
-                      <td>
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(item.id)}
-                          onChange={() => toggleSelectRow(item.id)}
-                          style={{ cursor: "pointer" }}
-                        />
-                      </td>
+                      {!isReadOnly() && (
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(item.id)}
+                            onChange={() => toggleSelectRow(item.id)}
+                            style={{ cursor: "pointer" }}
+                          />
+                        </td>
+                      )}
                       <td style={{ color: "var(--text-muted)" }}>{((currentPage - 1) * pageSize) + i + 1}</td>
                       <td style={{ fontWeight: 500, color: "var(--text-primary)" }}>{item.call_date}</td>
                       <td>{item.firm || <span style={{ color: "var(--text-muted)", fontStyle: "italic" }}>—</span>}</td>
@@ -1017,75 +1047,79 @@ function Inspection() {
                               ? "badge-purple"
                               : "badge-red"
                           }`}>
-                          {item.inspection_passed}
+                        {item.inspection_passed}
                         </span>
                       </td>
                       <td><span className="badge badge-blue" style={{ fontWeight: "700" }}>{item.quantity}</span></td>
-                      <td>
-                        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                          {item.inspection_passed === "Pass" && (
-                            <button
-                              className="btn btn-ghost btn-sm"
-                              title="Queue for Dispatch"
-                              style={{
-                                padding: "4px 8px",
-                                fontSize: "11px",
-                                fontWeight: "600",
-                                color: "var(--success)",
-                                background: "rgba(16, 185, 129, 0.1)",
-                                border: "none",
-                                borderRadius: "4px",
-                                cursor: "pointer"
-                              }}
-                              onClick={() => queueForDispatch(item)}
-                            >
-                              🚚 Dispatch
-                            </button>
-                          )}
-                          {item.inspection_passed === "Fail" && (
-                            <button
-                              className="btn btn-ghost btn-sm"
-                              title="Re-queue for Next Inspection"
-                              style={{
-                                padding: "4px 8px",
-                                fontSize: "11px",
-                                fontWeight: "600",
-                                color: "var(--accent)",
-                                background: "var(--accent-soft)",
-                                border: "none",
-                                borderRadius: "4px",
-                                cursor: "pointer"
-                              }}
-                              onClick={() => reQueueInspection(item)}
-                            >
-                              🔄 Re-inspect
-                            </button>
-                          )}
-                          <button className="btn-icon" title="Edit" onClick={() => startEdit(item)}>
-                            <FiEdit2 size={13} />
-                          </button>
-                          {deleteConfirmId === item.id ? (
-                            <span style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "12px", color: "var(--danger)" }}>
-                              Sure?
-                              <button className="btn-icon" style={{ color: "var(--danger)" }} onClick={() => deleteInspection(item.id)}>
-                                <FiCheck size={13} />
+                      {!isReadOnly() && (
+                        <td>
+                          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                            {item.inspection_passed === "Pass" && (
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                title="Queue for Dispatch"
+                                style={{
+                                  padding: "4px 8px",
+                                  fontSize: "11px",
+                                  fontWeight: "600",
+                                  color: "var(--success)",
+                                  background: "rgba(16, 185, 129, 0.1)",
+                                  border: "none",
+                                  borderRadius: "4px",
+                                  cursor: "pointer"
+                                }}
+                                onClick={() => queueForDispatch(item)}
+                              >
+                                🚚 Dispatch
                               </button>
-                              <button className="btn-icon" onClick={() => setDeleteConfirmId(null)}>
-                                <FiX size={13} />
+                            )}
+                            {item.inspection_passed === "Fail" && (
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                title="Re-queue for Next Inspection"
+                                style={{
+                                  padding: "4px 8px",
+                                  fontSize: "11px",
+                                  fontWeight: "600",
+                                  color: "var(--accent)",
+                                  background: "var(--accent-soft)",
+                                  border: "none",
+                                  borderRadius: "4px",
+                                  cursor: "pointer"
+                                }}
+                                onClick={() => reQueueInspection(item)}
+                              >
+                                🔄 Re-inspect
                               </button>
-                            </span>
-                          ) : (
-                            <button
-                              className="btn-icon"
-                              title="Delete"
-                              style={{ color: "var(--danger)" }}
-                              onClick={() => { setDeleteConfirmId(item.id); setEditId(null); }}
-                            >
-                              <FiTrash2 size={13} />
+                            )}
+                            <button className="btn-icon" title="Edit" onClick={() => startEdit(item)}>
+                              <FiEdit2 size={13} />
                             </button>
-                          )}
-                        </div>
-                      </td>
+                            {canDelete() && (
+                              deleteConfirmId === item.id ? (
+                                <span style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "12px", color: "var(--danger)" }}>
+                                  Sure?
+                                  <button className="btn-icon" style={{ color: "var(--danger)" }} onClick={() => deleteInspection(item.id)}>
+                                    <FiCheck size={13} />
+                                  </button>
+                                  <button className="btn-icon" onClick={() => setDeleteConfirmId(null)}>
+                                    <FiX size={13} />
+                                  </button>
+                                </span>
+                              ) : (
+                                <button
+                                  className="btn-icon"
+                                  title="Delete"
+                                  style={{ color: "var(--danger)" }}
+                                  onClick={() => { setDeleteConfirmId(item.id); setEditId(null); }}
+                                >
+                                  <FiTrash2 size={13} />
+                                </button>
+                              )
+                            )}
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}

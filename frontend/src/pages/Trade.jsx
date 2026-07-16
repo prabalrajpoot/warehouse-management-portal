@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import Navbar from "../components/Navbar";
 import api from "../api/api";
-import { FiPlus, FiSearch } from "react-icons/fi";
+import { FiPlus, FiSearch, FiEye } from "react-icons/fi";
+import { isReadOnly } from "../utils/auth";
 
 function Trade() {
   const [tradeName, setTradeName] = useState("");
@@ -47,22 +48,40 @@ function Trade() {
       <Navbar />
       <div className="page-content">
 
+        {/* Read-only banner for superadmin */}
+        {isReadOnly() && (
+          <div className="alert" style={{
+            background: "rgba(245,158,11,0.1)",
+            border: "1px solid rgba(245,158,11,0.3)",
+            color: "#f59e0b",
+            marginBottom: "16px",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px"
+          }}>
+            <FiEye size={14} style={{ flexShrink: 0 }} />
+            <span>You are viewing as <strong>Super Admin</strong> — read-only mode. No changes can be made.</span>
+          </div>
+        )}
+
         {/* Header */}
         <div className="page-header">
           <div>
             <h1 className="page-title">Trade Management</h1>
             <p className="page-subtitle">Create and manage trade categories</p>
           </div>
-          <button
-            className="btn btn-primary btn-sm"
-            onClick={() => { setShowForm(!showForm); setMsg(""); }}
-          >
-            <FiPlus size={14} /> {showForm ? "Cancel" : "Add Trade"}
-          </button>
+          {!isReadOnly() && (
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => { setShowForm(!showForm); setMsg(""); }}
+            >
+              <FiPlus size={14} /> {showForm ? "Cancel" : "Add Trade"}
+            </button>
+          )}
         </div>
 
         {/* Add Form */}
-        {showForm && (
+        {showForm && !isReadOnly() && (
           <div className="card">
             <div className="card-title">New Trade</div>
             <div className="form-grid">

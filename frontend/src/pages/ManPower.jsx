@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo } from "react";
 import Navbar from "../components/Navbar";
 import api from "../api/api";
-import { FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch, FiUpload } from "react-icons/fi";
+import { FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch, FiUpload, FiEye } from "react-icons/fi";
 import * as XLSX from "xlsx";
-import { isReadOnly, filterByWarehouse, isWarehouseManager, getWarehouseName } from "../utils/auth";
+import { isReadOnly, filterByWarehouse, isWarehouseManager, getWarehouseName, canDelete } from "../utils/auth";
 
 const toDMY = (dateStr) => {
   if (!dateStr) return "";
@@ -235,6 +235,16 @@ function ManPower() {
   const handleFileUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (isWarehouseManager()) {
+      const proceed = window.confirm(
+        "⚠️ Attention: Please ensure that all entries in your Excel file are valid and correct before uploading. As a Warehouse Manager, you will not have permission to delete entries once they are imported. Do you want to proceed with the upload?"
+      );
+      if (!proceed) {
+        e.target.value = "";
+        return;
+      }
+    }
 
     const reader = new FileReader();
     reader.onload = async (evt) => {
@@ -639,6 +649,22 @@ function ManPower() {
       <Navbar />
       <div className="page-content">
 
+        {/* Read-only banner for superadmin */}
+        {isReadOnly() && (
+          <div className="alert" style={{
+            background: "rgba(245,158,11,0.1)",
+            border: "1px solid rgba(245,158,11,0.3)",
+            color: "#f59e0b",
+            marginBottom: "16px",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px"
+          }}>
+            <FiEye size={14} style={{ flexShrink: 0 }} />
+            <span>You are viewing as <strong>Super Admin</strong> — read-only mode. No changes can be made.</span>
+          </div>
+        )}
+
         <div className="page-header">
           <div>
             <h1 className="page-title">Man Power Tracking</h1>
@@ -661,13 +687,15 @@ function ManPower() {
                 >
                   <FiUpload size={14} /> Upload Excel
                 </button>
-                <button
-                  className="btn btn-outline btn-sm"
-                  style={{ display: "flex", gap: "6px", alignItems: "center", color: "#ef4444", borderColor: "#fca5a5" }}
-                  onClick={handleDeleteAll}
-                >
-                  <FiTrash2 size={14} /> Delete All Logs
-                </button>
+                {canDelete() && (
+                  <button
+                    className="btn btn-outline btn-sm"
+                    style={{ display: "flex", gap: "6px", alignItems: "center", color: "#ef4444", borderColor: "#fca5a5" }}
+                    onClick={handleDeleteAll}
+                  >
+                    <FiTrash2 size={14} /> Delete All Logs
+                  </button>
+                )}
                 <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setEditId(null); setMsg(""); }}>
                   <FiPlus size={14} /> {showForm ? "Cancel" : "Add Man Power Log"}
                 </button>
@@ -1294,7 +1322,7 @@ function ManPower() {
                   <th>SUPERVISOR</th>
                   <th>OVERTIME (HRS)</th>
                   <th>REMARKS</th>
-                  <th>ACTIONS</th>
+                  {!isReadOnly() && <th>ACTIONS</th>}
                 </tr>
               </thead>
               <tbody>
@@ -1317,20 +1345,24 @@ function ManPower() {
                       <td><span className="badge badge-blue" style={{ fontWeight: 700 }}>{item.supervisor}</span></td>
                       <td><span className="badge badge-red" style={{ fontWeight: 700 }}>{item.overtime_hours}</span></td>
                       <td>{item.remarks || "—"}</td>
-                      <td>
-                        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                          <button className="btn-icon" title="Edit" onClick={() => startEdit(item)}><FiEdit2 size={13} /></button>
-                          {deleteConfirmId === item.id ? (
-                            <span style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "12px", color: "var(--danger)" }}>
-                              Sure?
-                              <button className="btn-icon" style={{ color: "var(--danger)" }} onClick={() => handleDelete(item.id)}><FiCheck size={13} /></button>
-                              <button className="btn-icon" onClick={() => setDeleteConfirmId(null)}><FiX size={13} /></button>
-                            </span>
-                          ) : (
-                            <button className="btn-icon" title="Delete" style={{ color: "var(--danger)" }} onClick={() => { setDeleteConfirmId(item.id); setEditId(null); }}><FiTrash2 size={13} /></button>
-                          )}
-                        </div>
-                      </td>
+                      {!isReadOnly() && (
+                        <td>
+                          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                            <button className="btn-icon" title="Edit" onClick={() => startEdit(item)}><FiEdit2 size={13} /></button>
+                            {canDelete() && (
+                              deleteConfirmId === item.id ? (
+                                <span style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "12px", color: "var(--danger)" }}>
+                                  Sure?
+                                  <button className="btn-icon" style={{ color: "var(--danger)" }} onClick={() => handleDelete(item.id)}><FiCheck size={13} /></button>
+                                  <button className="btn-icon" onClick={() => setDeleteConfirmId(null)}><FiX size={13} /></button>
+                                </span>
+                              ) : (
+                                <button className="btn-icon" title="Delete" style={{ color: "var(--danger)" }} onClick={() => { setDeleteConfirmId(item.id); setEditId(null); }}><FiTrash2 size={13} /></button>
+                              )
+                            )}
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}
