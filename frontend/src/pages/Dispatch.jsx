@@ -2,10 +2,10 @@ import { useState, useEffect } from "react";
 import Loader from "../components/Loader";
 import Navbar from "../components/Navbar";
 import api from "../api/api";
-import { FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch, FiDownload, FiUpload } from "react-icons/fi";
+import { FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch, FiDownload, FiUpload, FiEye } from "react-icons/fi";
 import jsPDF from "jspdf";
 import * as XLSX from "xlsx";
-import { isReadOnly, filterByWarehouse, isWarehouseManager, getWarehouseName } from "../utils/auth";
+import { isReadOnly, filterByWarehouse, isWarehouseManager, getWarehouseName, canDelete } from "../utils/auth";
 
 const FIRM_OPTIONS = ["ITI", "PTL", "VTL"];
 
@@ -400,6 +400,17 @@ function DispatchLog() {
   const uploadExcelFile = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    if (isWarehouseManager()) {
+      const proceed = window.confirm(
+        "⚠️ Attention: Please ensure that all entries in your Excel file are valid and correct before uploading. As a Warehouse Manager, you will not have permission to delete entries once they are imported. Do you want to proceed with the upload?"
+      );
+      if (!proceed) {
+        e.target.value = "";
+        return;
+      }
+    }
+
     setUploading(true);
     try {
       const formData = new FormData();
@@ -729,15 +740,18 @@ function DispatchLog() {
           <table className="data-table">
             <thead>
               <tr>
-                <th style={{ width: "40px" }}>
-                  <input
-                    type="checkbox"
-                    checked={isAllSelected}
-                    onChange={toggleSelectAll}
-                    style={{ cursor: "pointer" }}
-                  />
-                </th>
-                <th>#</th><th>Dispatched Date</th><th>Firm</th><th>Warehouse Name</th><th>Trade</th><th>Set Type</th><th>Dispatched Quantity</th><th>MS No./Barcode</th><th>Pkg Status</th><th>Actions</th>
+                {!isReadOnly() && (
+                  <th style={{ width: "40px" }}>
+                    <input
+                      type="checkbox"
+                      checked={isAllSelected}
+                      onChange={toggleSelectAll}
+                      style={{ cursor: "pointer" }}
+                    />
+                  </th>
+                )}
+                <th>#</th><th>Dispatched Date</th><th>Firm</th><th>Warehouse Name</th><th>Trade</th><th>Set Type</th><th>Dispatched Quantity</th><th>MS No./Barcode</th><th>Pkg Status</th>
+                {!isReadOnly() && <th>Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -746,19 +760,21 @@ function DispatchLog() {
               ) : (
                 paginated.map((item, i) => (
                   <tr id={`dispatch-row-${item.id}`} key={item.id} style={{ background: selectedIds.includes(item.id) ? "var(--bg-elevated)" : "transparent" }}>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.includes(item.id)}
-                        onChange={() => toggleSelectRow(item.id)}
-                        style={{ cursor: "pointer" }}
-                      />
-                    </td>
+                    {!isReadOnly() && (
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(item.id)}
+                          onChange={() => toggleSelectRow(item.id)}
+                          style={{ cursor: "pointer" }}
+                        />
+                      </td>
+                    )}
                     <td style={{ color: "var(--text-muted)" }}>{((currentPage - 1) * pageSize) + i + 1}</td>
                     <td style={{ fontWeight: 500, color: "var(--text-primary)" }}>{item.call_date}</td>
                     <td>{item.firm || <span style={{ color: "var(--text-muted)", fontStyle: "italic" }}>—</span>}</td>
-                    <td>{item.warehouse_name}</td>
-                    <td><span className="badge badge-purple">{item.trade}</span></td>
+                    <td>{item.warehouse_name ? item.warehouse_name : <span style={{ color: "var(--text-muted)" }}>—</span>}</td>
+                    <td>{item.trade ? <span className="badge badge-purple">{item.trade}</span> : <span style={{ color: "var(--text-muted)" }}>—</span>}</td>
                     <td>{item.set_type ? <span className="badge badge-orange">{item.set_type}</span> : <span style={{ color: "var(--text-muted)" }}>—</span>}</td>
                     <td><span className="badge badge-blue" style={{ fontWeight: "700" }}>{item.quantity}</span></td>
                     <td><code>{item.ms_barcode || "—"}</code></td>
@@ -771,31 +787,35 @@ function DispatchLog() {
                         {item.packaging_status || "Pending For Mark"}
                       </span>
                     </td>
-                    <td>
-                      <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                        <button className="btn-icon" title="Edit" onClick={() => startEdit(item)}><FiEdit2 size={13} /></button>
-                        <button
-                          className="btn-icon"
-                          style={{ color: "#3b82f6", cursor: "pointer", display: "flex", alignItems: "center" }}
-                          title="Mark as Returned (Move to Return Log)"
-                          onClick={() => handleReturnDispatch(item)}
-                        >
-                          🔄
-                        </button>
-                        {deleteConfirmId === item.id ? (
-                          <span style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "12px", color: "var(--danger)" }}>
-                            Sure?
-                            <button className="btn-icon" style={{ color: "var(--danger)" }} onClick={() => deleteDispatch(item.id)}><FiCheck size={13} /></button>
-                            <button className="btn-icon" onClick={() => setDeleteConfirmId(null)}><FiX size={13} /></button>
-                          </span>
-                        ) : (
-                          <button className="btn-icon" title="Delete" style={{ color: "var(--danger)" }}
-                            onClick={() => { setDeleteConfirmId(item.id); setEditId(null); }}>
-                            <FiTrash2 size={13} />
+                    {!isReadOnly() && (
+                      <td>
+                        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                          <button className="btn-icon" title="Edit" onClick={() => startEdit(item)}><FiEdit2 size={13} /></button>
+                          <button
+                            className="btn-icon"
+                            style={{ color: "#3b82f6", cursor: "pointer", display: "flex", alignItems: "center" }}
+                            title="Mark as Returned (Move to Return Log)"
+                            onClick={() => handleReturnDispatch(item)}
+                          >
+                            🔄
                           </button>
-                        )}
-                      </div>
-                    </td>
+                          {canDelete() && (
+                            deleteConfirmId === item.id ? (
+                              <span style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "12px", color: "var(--danger)" }}>
+                                Sure?
+                                <button className="btn-icon" style={{ color: "var(--danger)" }} onClick={() => deleteDispatch(item.id)}><FiCheck size={13} /></button>
+                                <button className="btn-icon" onClick={() => setDeleteConfirmId(null)}><FiX size={13} /></button>
+                              </span>
+                            ) : (
+                              <button className="btn-icon" title="Delete" style={{ color: "var(--danger)" }}
+                                onClick={() => { setDeleteConfirmId(item.id); setEditId(null); }}>
+                                <FiTrash2 size={13} />
+                              </button>
+                            )
+                          )}
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
@@ -1557,6 +1577,22 @@ function Dispatch() {
     <div className="page-layout">
       <Navbar />
       <div className="page-content">
+
+        {/* Read-only banner for superadmin */}
+        {isReadOnly() && (
+          <div className="alert" style={{
+            background: "rgba(245,158,11,0.1)",
+            border: "1px solid rgba(245,158,11,0.3)",
+            color: "#f59e0b",
+            marginBottom: "16px",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px"
+          }}>
+            <FiEye size={14} style={{ flexShrink: 0 }} />
+            <span>You are viewing as <strong>Super Admin</strong> — read-only mode. No changes can be made.</span>
+          </div>
+        )}
 
         {/* Header */}
         <div className="page-header">

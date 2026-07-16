@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import Loader from "../components/Loader";
 import Navbar from "../components/Navbar";
 import api from "../api/api";
-import { FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch, FiDownload } from "react-icons/fi";
+import { FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch, FiDownload, FiEye } from "react-icons/fi";
+import { isReadOnly } from "../utils/auth";
 import jsPDF from "jspdf";
 import * as XLSX from "xlsx";
 
@@ -289,12 +290,14 @@ function InwardSection() {
         <button className="btn btn-ghost btn-sm" onClick={exportExcel}>
           <FiDownload size={13} /> Excel
         </button>
-        <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setEditId(null); setMsg(""); }}>
-          <FiPlus size={14} /> {showForm ? "Cancel" : "Add Inward Entry"}
-        </button>
+        {!isReadOnly() && (
+          <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setEditId(null); setMsg(""); }}>
+            <FiPlus size={14} /> {showForm ? "Cancel" : "Add Inward Entry"}
+          </button>
+        )}
       </div>
 
-      {showForm && (
+      {showForm && !isReadOnly() && (
         <div className="card">
           <div className="card-title">New Inward Stock Entry</div>
           <div className="form-grid">
@@ -326,7 +329,7 @@ function InwardSection() {
         </div>
       )}
 
-      {editId && (
+      {editId && !isReadOnly() && (
         <div id="inward-edit-form-container" className="card">
           <div className="card-title">Edit Inward Entry — ID #{editId}</div>
           <div className="form-grid">
@@ -373,7 +376,7 @@ function InwardSection() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", flexWrap: "wrap", gap: "12px" }}>
           <span style={{ fontWeight: 600, color: "var(--text-primary)", fontSize: "14px" }}>Inward Records ({filtered.length})</span>
           <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-            {selectedIds.length > 0 && (
+            {!isReadOnly() && selectedIds.length > 0 && (
               <button className="btn btn-danger btn-sm" onClick={deleteSelected}>
                 <FiTrash2 size={13} /> Delete Selected ({selectedIds.length})
               </button>
@@ -412,16 +415,19 @@ function InwardSection() {
           <table className="data-table">
             <thead>
               <tr>
-                <th style={{ width: "40px" }}>
-                  <input
-                    type="checkbox"
-                    checked={isAllSelected}
-                    onChange={toggleSelectAll}
-                    style={{ cursor: "pointer" }}
-                  />
-                </th>
+                {!isReadOnly() && (
+                  <th style={{ width: "40px" }}>
+                    <input
+                      type="checkbox"
+                      checked={isAllSelected}
+                      onChange={toggleSelectAll}
+                      style={{ cursor: "pointer" }}
+                    />
+                  </th>
+                )}
                 <th>#</th><th>Received Date</th><th>Received Qty</th><th>Invoice Date</th>
-                <th>Invoice No.</th><th>Invoice Qty</th><th>Short/Damage</th><th>Item Name</th><th>Brand/Desc</th><th>Trade</th><th>Actions</th>
+                <th>Invoice No.</th><th>Invoice Qty</th><th>Short/Damage</th><th>Item Name</th><th>Brand/Desc</th><th>Trade</th>
+                {!isReadOnly() && <th>Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -430,14 +436,16 @@ function InwardSection() {
               ) : (
                 paginated.map((item, i) => (
                   <tr id={`inward-row-${item.id}`} key={item.id} style={{ background: selectedIds.includes(item.id) ? "var(--bg-elevated)" : "transparent" }}>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.includes(item.id)}
-                        onChange={() => toggleSelectRow(item.id)}
-                        style={{ cursor: "pointer" }}
-                      />
-                    </td>
+                    {!isReadOnly() && (
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(item.id)}
+                          onChange={() => toggleSelectRow(item.id)}
+                          style={{ cursor: "pointer" }}
+                        />
+                      </td>
+                    )}
                     <td style={{ color: "var(--text-muted)" }}>{((currentPage - 1) * pageSize) + i + 1}</td>
                     <td style={{ fontWeight: 500, color: "var(--text-primary)" }}>{item.received_date}</td>
                     <td><span className="badge badge-blue" style={{ fontWeight: 700 }}>{item.received_qty ?? "—"}</span></td>
@@ -460,23 +468,25 @@ function InwardSection() {
                         <span style={{ color: "var(--text-muted)", fontStyle: "italic" }}>—</span>
                       )}
                     </td>
-                    <td>
-                      <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                        <button className="btn-icon" title="Edit" onClick={() => startEdit(item)}><FiEdit2 size={13} /></button>
-                        {deleteConfirmId === item.id ? (
-                          <span style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "12px", color: "var(--danger)" }}>
-                            Sure?
-                            <button className="btn-icon" style={{ color: "var(--danger)" }} onClick={() => deleteEntry(item.id)}><FiCheck size={13} /></button>
-                            <button className="btn-icon" onClick={() => setDeleteConfirmId(null)}><FiX size={13} /></button>
-                          </span>
-                        ) : (
-                          <button className="btn-icon" title="Delete" style={{ color: "var(--danger)" }}
-                            onClick={() => { setDeleteConfirmId(item.id); setEditId(null); }}>
-                            <FiTrash2 size={13} />
-                          </button>
-                        )}
-                      </div>
-                    </td>
+                    {!isReadOnly() && (
+                      <td>
+                        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                          <button className="btn-icon" title="Edit" onClick={() => startEdit(item)}><FiEdit2 size={13} /></button>
+                          {deleteConfirmId === item.id ? (
+                            <span style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "12px", color: "var(--danger)" }}>
+                              Sure?
+                              <button className="btn-icon" style={{ color: "var(--danger)" }} onClick={() => deleteEntry(item.id)}><FiCheck size={13} /></button>
+                              <button className="btn-icon" onClick={() => setDeleteConfirmId(null)}><FiX size={13} /></button>
+                            </span>
+                          ) : (
+                            <button className="btn-icon" title="Delete" style={{ color: "var(--danger)" }}
+                              onClick={() => { setDeleteConfirmId(item.id); setEditId(null); }}>
+                              <FiTrash2 size={13} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
@@ -761,12 +771,14 @@ function OutwardSection() {
         <button className="btn btn-ghost btn-sm" onClick={exportExcel}>
           <FiDownload size={13} /> Excel
         </button>
-        <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setEditId(null); setMsg(""); }}>
-          <FiPlus size={14} /> {showForm ? "Cancel" : "Add Outward Entry"}
-        </button>
+        {!isReadOnly() && (
+          <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setEditId(null); setMsg(""); }}>
+            <FiPlus size={14} /> {showForm ? "Cancel" : "Add Outward Entry"}
+          </button>
+        )}
       </div>
 
-      {showForm && (
+      {showForm && !isReadOnly() && (
         <div className="card">
           <div className="card-title">New Outward Stock Entry</div>
           <div className="form-grid">
@@ -785,7 +797,7 @@ function OutwardSection() {
         </div>
       )}
 
-      {editId && (
+      {editId && !isReadOnly() && (
         <div id="outward-edit-form-container" className="card">
           <div className="card-title">Edit Outward Entry — ID #{editId}</div>
           <div className="form-grid">
@@ -819,7 +831,7 @@ function OutwardSection() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", flexWrap: "wrap", gap: "12px" }}>
           <span style={{ fontWeight: 600, color: "var(--text-primary)", fontSize: "14px" }}>Outward Records ({filtered.length})</span>
           <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-            {selectedIds.length > 0 && (
+            {!isReadOnly() && selectedIds.length > 0 && (
               <button className="btn btn-danger btn-sm" onClick={deleteSelected}>
                 <FiTrash2 size={13} /> Delete Selected ({selectedIds.length})
               </button>
@@ -872,16 +884,19 @@ function OutwardSection() {
           <table className="data-table">
             <thead>
               <tr>
-                <th style={{ width: "40px" }}>
-                  <input
-                    type="checkbox"
-                    checked={isAllSelected}
-                    onChange={toggleSelectAll}
-                    style={{ cursor: "pointer" }}
-                  />
-                </th>
+                {!isReadOnly() && (
+                  <th style={{ width: "40px" }}>
+                    <input
+                      type="checkbox"
+                      checked={isAllSelected}
+                      onChange={toggleSelectAll}
+                      style={{ cursor: "pointer" }}
+                    />
+                  </th>
+                )}
                 <th>#</th><th>Transfer Date</th><th>Invoice No.</th><th>Item Name</th>
-                <th>Brand</th><th>Trade Name</th><th>Qty</th><th>Location From</th><th>Location To</th><th>Actions</th>
+                <th>Brand</th><th>Trade Name</th><th>Qty</th><th>Location From</th><th>Location To</th>
+                {!isReadOnly() && <th>Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -890,14 +905,16 @@ function OutwardSection() {
               ) : (
                 paginated.map((item, i) => (
                   <tr id={`outward-row-${item.id}`} key={item.id} style={{ background: selectedIds.includes(item.id) ? "var(--bg-elevated)" : "transparent" }}>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.includes(item.id)}
-                        onChange={() => toggleSelectRow(item.id)}
-                        style={{ cursor: "pointer" }}
-                      />
-                    </td>
+                    {!isReadOnly() && (
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(item.id)}
+                          onChange={() => toggleSelectRow(item.id)}
+                          style={{ cursor: "pointer" }}
+                        />
+                      </td>
+                    )}
                     <td style={{ color: "var(--text-muted)" }}>{((currentPage - 1) * pageSize) + i + 1}</td>
                     <td style={{ fontWeight: 500, color: "var(--text-primary)" }}>{item.transfer_date}</td>
                     <td><code>{item.invoice_no || "—"}</code></td>
@@ -907,23 +924,25 @@ function OutwardSection() {
                     <td><span className="badge badge-blue" style={{ fontWeight: 700 }}>{item.qty ?? "—"}</span></td>
                     <td>{item.warehouse_from || "—"}</td>
                     <td>{item.warehouse_to || "—"}</td>
-                    <td>
-                      <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                        <button className="btn-icon" title="Edit" onClick={() => startEdit(item)}><FiEdit2 size={13} /></button>
-                        {deleteConfirmId === item.id ? (
-                          <span style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "12px", color: "var(--danger)" }}>
-                            Sure?
-                            <button className="btn-icon" style={{ color: "var(--danger)" }} onClick={() => deleteEntry(item.id)}><FiCheck size={13} /></button>
-                            <button className="btn-icon" onClick={() => setDeleteConfirmId(null)}><FiX size={13} /></button>
-                          </span>
-                        ) : (
-                          <button className="btn-icon" title="Delete" style={{ color: "var(--danger)" }}
-                            onClick={() => { setDeleteConfirmId(item.id); setEditId(null); }}>
-                            <FiTrash2 size={13} />
-                          </button>
-                        )}
-                      </div>
-                    </td>
+                    {!isReadOnly() && (
+                      <td>
+                        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                          <button className="btn-icon" title="Edit" onClick={() => startEdit(item)}><FiEdit2 size={13} /></button>
+                          {deleteConfirmId === item.id ? (
+                            <span style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "12px", color: "var(--danger)" }}>
+                              Sure?
+                              <button className="btn-icon" style={{ color: "var(--danger)" }} onClick={() => deleteEntry(item.id)}><FiCheck size={13} /></button>
+                              <button className="btn-icon" onClick={() => setDeleteConfirmId(null)}><FiX size={13} /></button>
+                            </span>
+                          ) : (
+                            <button className="btn-icon" title="Delete" style={{ color: "var(--danger)" }}
+                              onClick={() => { setDeleteConfirmId(item.id); setEditId(null); }}>
+                              <FiTrash2 size={13} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
@@ -1150,6 +1169,22 @@ function Inventory() {
     <div className="page-layout">
       <Navbar />
       <div className="page-content">
+
+        {/* Read-only banner for superadmin */}
+        {isReadOnly() && (
+          <div className="alert" style={{
+            background: "rgba(245,158,11,0.1)",
+            border: "1px solid rgba(245,158,11,0.3)",
+            color: "#f59e0b",
+            marginBottom: "16px",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px"
+          }}>
+            <FiEye size={14} style={{ flexShrink: 0 }} />
+            <span>You are viewing as <strong>Super Admin</strong> — read-only mode. No changes can be made.</span>
+          </div>
+        )}
 
         <div className="page-header">
           <div>

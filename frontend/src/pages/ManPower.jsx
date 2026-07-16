@@ -2,9 +2,9 @@ import { useState, useEffect, useMemo } from "react";
 import Loader from "../components/Loader";
 import Navbar from "../components/Navbar";
 import api from "../api/api";
-import { FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch, FiUpload } from "react-icons/fi";
+import { FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch, FiUpload, FiEye } from "react-icons/fi";
 import * as XLSX from "xlsx";
-import { isReadOnly, filterByWarehouse, isWarehouseManager, getWarehouseName } from "../utils/auth";
+import { isReadOnly, filterByWarehouse, isWarehouseManager, getWarehouseName, canDelete } from "../utils/auth";
 
 const toDMY = (dateStr) => {
   if (!dateStr) return "";
@@ -49,7 +49,7 @@ const calculateDayAndMonth = (dateVal) => {
 
 const parseExcelDate = (val) => {
   if (!val) return "";
-  
+
   if (typeof val === 'number') {
     const dateObj = new Date((val - 25569) * 86400 * 1000);
     const d = String(dateObj.getDate()).padStart(2, '0');
@@ -57,14 +57,14 @@ const parseExcelDate = (val) => {
     const y = dateObj.getFullYear();
     return `${d}/${m}/${y}`;
   }
-  
+
   const str = String(val).trim();
-  
+
   if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
     const [y, m, d] = str.split("-");
     return `${d}/${m}/${y}`;
   }
-  
+
   if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}$/.test(str)) {
     const parts = str.split(/[\/\-]/);
     const d = parts[0].padStart(2, '0');
@@ -72,7 +72,7 @@ const parseExcelDate = (val) => {
     const y = parts[2];
     return `${d}/${m}/${y}`;
   }
-  
+
   return str;
 };
 
@@ -242,7 +242,18 @@ function ManPower() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (isWarehouseManager()) {
+      const proceed = window.confirm(
+        "⚠️ Attention: Please ensure that all entries in your Excel file are valid and correct before uploading. As a Warehouse Manager, you will not have permission to delete entries once they are imported. Do you want to proceed with the upload?"
+      );
+      if (!proceed) {
+        e.target.value = "";
+        return;
+      }
+    }
+
     setUploading(true);
+
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
@@ -397,7 +408,7 @@ function ManPower() {
       const roleWorkers = (prev.workers || []).filter(w => w.role === role);
       const otherWorkers = (prev.workers || []).filter(w => w.role !== role);
       const diff = newCount - roleWorkers.length;
-      
+
       let updatedRoleWorkers = [...roleWorkers];
       if (diff > 0) {
         for (let i = 0; i < diff; i++) {
@@ -406,7 +417,7 @@ function ManPower() {
       } else if (diff < 0) {
         updatedRoleWorkers = updatedRoleWorkers.slice(0, newCount);
       }
-      
+
       const key = role === "permanent" ? "permanent_manpower" : role === "additional" ? "additional_manpower" : "supervisor";
       return {
         ...prev,
@@ -422,7 +433,7 @@ function ManPower() {
       const roleWorkers = (prev.workers || []).filter(w => w.role === role);
       const otherWorkers = (prev.workers || []).filter(w => w.role !== role);
       const diff = newCount - roleWorkers.length;
-      
+
       let updatedRoleWorkers = [...roleWorkers];
       if (diff > 0) {
         for (let i = 0; i < diff; i++) {
@@ -431,7 +442,7 @@ function ManPower() {
       } else if (diff < 0) {
         updatedRoleWorkers = updatedRoleWorkers.slice(0, newCount);
       }
-      
+
       const key = role === "permanent" ? "permanent_manpower" : role === "additional" ? "additional_manpower" : "supervisor";
       return {
         ...prev,
@@ -523,7 +534,7 @@ function ManPower() {
       return;
     }
     try {
-      await api.put(`/man-power/workers/${workerId}`, { 
+      await api.put(`/man-power/workers/${workerId}`, {
         name: editingWorkerName,
         govt_id: editingWorkerGovtId
       });
@@ -559,11 +570,11 @@ function ManPower() {
         date: formattedDate,
         location: newWorkerLocation
       });
-      
+
       setNewWorkerName("");
       setNewWorkerGovtId("");
       setShowAddForm(false);
-      
+
       fetchModalWorkers(modalType);
       fetchRecords();
     } catch (e) {
@@ -650,6 +661,22 @@ function ManPower() {
       <Navbar />
       <div className="page-content">
 
+        {/* Read-only banner for superadmin */}
+        {isReadOnly() && (
+          <div className="alert" style={{
+            background: "rgba(245,158,11,0.1)",
+            border: "1px solid rgba(245,158,11,0.3)",
+            color: "#f59e0b",
+            marginBottom: "16px",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px"
+          }}>
+            <FiEye size={14} style={{ flexShrink: 0 }} />
+            <span>You are viewing as <strong>Super Admin</strong> — read-only mode. No changes can be made.</span>
+          </div>
+        )}
+
         <div className="page-header">
           <div>
             <h1 className="page-title">Man Power Tracking</h1>
@@ -672,13 +699,15 @@ function ManPower() {
                 >
                   <FiUpload size={14} /> Upload Excel
                 </button>
-                <button
-                  className="btn btn-outline btn-sm"
-                  style={{ display: "flex", gap: "6px", alignItems: "center", color: "#ef4444", borderColor: "#fca5a5" }}
-                  onClick={handleDeleteAll}
-                >
-                  <FiTrash2 size={14} /> Delete All Logs
-                </button>
+                {canDelete() && (
+                  <button
+                    className="btn btn-outline btn-sm"
+                    style={{ display: "flex", gap: "6px", alignItems: "center", color: "#ef4444", borderColor: "#fca5a5" }}
+                    onClick={handleDeleteAll}
+                  >
+                    <FiTrash2 size={14} /> Delete All Logs
+                  </button>
+                )}
                 <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setEditId(null); setMsg(""); }}>
                   <FiPlus size={14} /> {showForm ? "Cancel" : "Add Man Power Log"}
                 </button>
@@ -695,923 +724,927 @@ function ManPower() {
           <>
             {/* New entry form */}
             {showForm && !isReadOnly() && (
-          <div className="card" style={{ marginBottom: "20px" }}>
-            <div className="card-title">New Man Power Entry</div>
-            <div className="form-grid" style={{ marginBottom: "16px" }}>
-              <div className="form-group">
-                <label className="form-label">Log Date *</label>
-                <input
-                  className="form-input"
-                  type="date"
-                  value={form.date}
-                  onChange={(e) => handleDateChange(e.target.value, false)}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Day (Auto)</label>
-                <input
-                  className="form-input"
-                  style={{ background: "var(--bg-muted)", cursor: "not-allowed" }}
-                  type="text"
-                  placeholder="Computed day"
-                  value={form.day}
-                  readOnly
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Month (Auto)</label>
-                <input
-                  className="form-input"
-                  style={{ background: "var(--bg-muted)", cursor: "not-allowed" }}
-                  type="text"
-                  placeholder="Computed month"
-                  value={form.month}
-                  readOnly
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Warehouse Location *</label>
-                <select
-                  className="form-select"
-                  value={form.warehouse_location}
-                  onChange={(e) => setForm(f => ({ ...f, warehouse_location: e.target.value }))}
-                  disabled={isWarehouseManager()}
-                >
-                  {isWarehouseManager() ? (
-                    <option value={getWarehouseName()}>{getWarehouseName()}</option>
+              <div className="card" style={{ marginBottom: "20px" }}>
+                <div className="card-title">New Man Power Entry</div>
+                <div className="form-grid" style={{ marginBottom: "16px" }}>
+                  <div className="form-group">
+                    <label className="form-label">Log Date *</label>
+                    <input
+                      className="form-input"
+                      type="date"
+                      value={form.date}
+                      onChange={(e) => handleDateChange(e.target.value, false)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Day (Auto)</label>
+                    <input
+                      className="form-input"
+                      style={{ background: "var(--bg-muted)", cursor: "not-allowed" }}
+                      type="text"
+                      placeholder="Computed day"
+                      value={form.day}
+                      readOnly
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Month (Auto)</label>
+                    <input
+                      className="form-input"
+                      style={{ background: "var(--bg-muted)", cursor: "not-allowed" }}
+                      type="text"
+                      placeholder="Computed month"
+                      value={form.month}
+                      readOnly
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Warehouse Location *</label>
+                    <select
+                      className="form-select"
+                      value={form.warehouse_location}
+                      onChange={(e) => setForm(f => ({ ...f, warehouse_location: e.target.value }))}
+                      disabled={isWarehouseManager()}
+                    >
+                      {isWarehouseManager() ? (
+                        <option value={getWarehouseName()}>{getWarehouseName()}</option>
+                      ) : (
+                        <>
+                          <option value="">--Select Warehouse--</option>
+                          {warehouses.map(wh => <option key={wh.id} value={wh.name}>{wh.name}</option>)}
+                        </>
+                      )}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Permanent Manpower *</label>
+                    <input
+                      className="form-input"
+                      type="number"
+                      placeholder="e.g. 10"
+                      value={form.permanent_manpower}
+                      onChange={(e) => handleNewCountChange("permanent", e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Additional Manpower *</label>
+                    <input
+                      className="form-input"
+                      type="number"
+                      placeholder="e.g. 5"
+                      value={form.additional_manpower}
+                      onChange={(e) => handleNewCountChange("additional", e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Supervisor Count *</label>
+                    <input
+                      className="form-input"
+                      type="number"
+                      placeholder="e.g. 2"
+                      value={form.supervisor}
+                      onChange={(e) => handleNewCountChange("supervisor", e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Overtime (hrs) *</label>
+                    <input
+                      className="form-input"
+                      type="number"
+                      step="0.5"
+                      placeholder="e.g. 8"
+                      value={form.overtime_hours}
+                      onChange={(e) => setForm(f => ({ ...f, overtime_hours: e.target.value }))}
+                    />
+                  </div>
+                  <div className="form-group" style={{ gridColumn: "span 2" }}>
+                    <label className="form-label">Remarks</label>
+                    <input
+                      className="form-input"
+                      placeholder="Shift notes or other details"
+                      value={form.remarks}
+                      onChange={(e) => setForm(f => ({ ...f, remarks: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                {/* Personnel Allocation Section inside the creation form */}
+                <div style={{ marginTop: "24px", borderTop: "1px solid var(--border)", paddingTop: "20px", marginBottom: "20px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "10px" }}>
+                    <h4 style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: "var(--text-primary)" }}>
+                      👥 Personnel Details Allocation Directory
+                    </h4>
+                    <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                      <select
+                        id="new-entry-worker-role-select"
+                        className="form-select"
+                        style={{ width: "160px", height: "32px", padding: "0 8px", fontSize: "12px" }}
+                      >
+                        <option value="permanent">Permanent Worker</option>
+                        <option value="additional">Additional Worker</option>
+                        <option value="supervisor">Supervisor</option>
+                      </select>
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm"
+                        style={{ height: "32px", padding: "0 10px", fontSize: "12px", display: "flex", alignItems: "center", gap: "4px" }}
+                        onClick={() => {
+                          const role = document.getElementById("new-entry-worker-role-select").value;
+                          const newWorker = {
+                            id: null,
+                            name: "",
+                            govt_id: "",
+                            role: role
+                          };
+                          setForm(prev => {
+                            const updatedWorkers = [...(prev.workers || []), newWorker];
+                            const key = role === "permanent" ? "permanent_manpower" : role === "additional" ? "additional_manpower" : "supervisor";
+                            return {
+                              ...prev,
+                              workers: updatedWorkers,
+                              [key]: Number(prev[key] || 0) + 1
+                            };
+                          });
+                        }}
+                      >
+                        <FiPlus size={12} /> Add Worker row
+                      </button>
+                    </div>
+                  </div>
+
+                  {(!form.workers || form.workers.length === 0) ? (
+                    <div style={{ padding: "16px", background: "var(--bg-base)", borderRadius: "6px", textAlign: "center", color: "var(--text-secondary)", fontSize: "13px" }}>
+                      No personnel allocated to this entry yet. Adjust headcounts or click "Add Worker row" above.
+                    </div>
                   ) : (
-                    <>
-                      <option value="">--Select Warehouse--</option>
-                      {warehouses.map(wh => <option key={wh.id} value={wh.name}>{wh.name}</option>)}
-                    </>
+                    <div style={{ maxHeight: "300px", overflowY: "auto", border: "1px solid var(--border)", borderRadius: "6px" }}>
+                      <table className="data-table" style={{ margin: 0, fontSize: "13px" }}>
+                        <thead>
+                          <tr>
+                            <th style={{ padding: "6px 12px" }}>Designation</th>
+                            <th style={{ padding: "6px 12px" }}>Name</th>
+                            <th style={{ padding: "6px 12px" }}>Aadhar Number</th>
+                            <th style={{ padding: "6px 12px", width: "80px", textAlign: "center" }}>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {form.workers.map((w, idx) => (
+                            <tr key={idx}>
+                              <td style={{ padding: "6px 12px" }}>
+                                <span className={`badge badge-${w.role === "permanent" ? "green" : w.role === "additional" ? "orange" : "blue"}`} style={{ textTransform: "capitalize", fontSize: "11px", padding: "2px 6px" }}>
+                                  {w.role}
+                                </span>
+                              </td>
+                              <td style={{ padding: "6px 12px" }}>
+                                <input
+                                  type="text"
+                                  className="form-input"
+                                  style={{ padding: "4px 8px", fontSize: "13px", height: "30px" }}
+                                  placeholder="Worker Name"
+                                  value={w.name}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setForm(prev => {
+                                      const list = [...prev.workers];
+                                      list[idx] = { ...list[idx], name: val };
+                                      return { ...prev, workers: list };
+                                    });
+                                  }}
+                                />
+                              </td>
+                              <td style={{ padding: "6px 12px" }}>
+                                <input
+                                  type="text"
+                                  className="form-input"
+                                  style={{ padding: "4px 8px", fontSize: "13px", height: "30px", fontFamily: "monospace" }}
+                                  placeholder="Aadhar Number"
+                                  value={w.govt_id}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setForm(prev => {
+                                      const list = [...prev.workers];
+                                      list[idx] = { ...list[idx], govt_id: val };
+                                      return { ...prev, workers: list };
+                                    });
+                                  }}
+                                />
+                              </td>
+                              <td style={{ padding: "6px 12px", textAlign: "center" }}>
+                                <button
+                                  type="button"
+                                  className="btn btn-icon"
+                                  style={{ color: "var(--danger)" }}
+                                  onClick={() => {
+                                    setForm(prev => {
+                                      const list = prev.workers.filter((_, i) => i !== idx);
+                                      const key = w.role === "permanent" ? "permanent_manpower" : w.role === "additional" ? "additional_manpower" : "supervisor";
+                                      const newCount = Math.max(0, Number(prev[key] || 0) - 1);
+                                      return {
+                                        ...prev,
+                                        workers: list,
+                                        [key]: newCount
+                                      };
+                                    });
+                                  }}
+                                >
+                                  <FiTrash2 size={13} />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   )}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Permanent Manpower *</label>
-                <input
-                  className="form-input"
-                  type="number"
-                  placeholder="e.g. 10"
-                  value={form.permanent_manpower}
-                  onChange={(e) => handleNewCountChange("permanent", e.target.value)}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Additional Manpower *</label>
-                <input
-                  className="form-input"
-                  type="number"
-                  placeholder="e.g. 5"
-                  value={form.additional_manpower}
-                  onChange={(e) => handleNewCountChange("additional", e.target.value)}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Supervisor Count *</label>
-                <input
-                  className="form-input"
-                  type="number"
-                  placeholder="e.g. 2"
-                  value={form.supervisor}
-                  onChange={(e) => handleNewCountChange("supervisor", e.target.value)}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Overtime (hrs) *</label>
-                <input
-                  className="form-input"
-                  type="number"
-                  step="0.5"
-                  placeholder="e.g. 8"
-                  value={form.overtime_hours}
-                  onChange={(e) => setForm(f => ({ ...f, overtime_hours: e.target.value }))}
-                />
-              </div>
-              <div className="form-group" style={{ gridColumn: "span 2" }}>
-                <label className="form-label">Remarks</label>
-                <input
-                  className="form-input"
-                  placeholder="Shift notes or other details"
-                  value={form.remarks}
-                  onChange={(e) => setForm(f => ({ ...f, remarks: e.target.value }))}
-                />
-              </div>
-            </div>
-
-            {/* Personnel Allocation Section inside the creation form */}
-            <div style={{ marginTop: "24px", borderTop: "1px solid var(--border)", paddingTop: "20px", marginBottom: "20px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "10px" }}>
-                <h4 style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: "var(--text-primary)" }}>
-                  👥 Personnel Details Allocation Directory
-                </h4>
-                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                  <select 
-                    id="new-entry-worker-role-select" 
-                    className="form-select" 
-                    style={{ width: "160px", height: "32px", padding: "0 8px", fontSize: "12px" }}
-                  >
-                    <option value="permanent">Permanent Worker</option>
-                    <option value="additional">Additional Worker</option>
-                    <option value="supervisor">Supervisor</option>
-                  </select>
-                  <button 
-                    type="button" 
-                    className="btn btn-outline btn-sm" 
-                    style={{ height: "32px", padding: "0 10px", fontSize: "12px", display: "flex", alignItems: "center", gap: "4px" }}
-                    onClick={() => {
-                      const role = document.getElementById("new-entry-worker-role-select").value;
-                      const newWorker = {
-                        id: null,
-                        name: "",
-                        govt_id: "",
-                        role: role
-                      };
-                      setForm(prev => {
-                        const updatedWorkers = [...(prev.workers || []), newWorker];
-                        const key = role === "permanent" ? "permanent_manpower" : role === "additional" ? "additional_manpower" : "supervisor";
-                        return {
-                          ...prev,
-                          workers: updatedWorkers,
-                          [key]: Number(prev[key] || 0) + 1
-                        };
-                      });
-                    }}
-                  >
-                    <FiPlus size={12} /> Add Worker row
-                  </button>
                 </div>
-              </div>
-
-              {(!form.workers || form.workers.length === 0) ? (
-                <div style={{ padding: "16px", background: "var(--bg-base)", borderRadius: "6px", textAlign: "center", color: "var(--text-secondary)", fontSize: "13px" }}>
-                  No personnel allocated to this entry yet. Adjust headcounts or click "Add Worker row" above.
-                </div>
-              ) : (
-                <div style={{ maxHeight: "300px", overflowY: "auto", border: "1px solid var(--border)", borderRadius: "6px" }}>
-                  <table className="data-table" style={{ margin: 0, fontSize: "13px" }}>
-                    <thead>
-                      <tr>
-                        <th style={{ padding: "6px 12px" }}>Designation</th>
-                        <th style={{ padding: "6px 12px" }}>Name</th>
-                        <th style={{ padding: "6px 12px" }}>Aadhar Number</th>
-                        <th style={{ padding: "6px 12px", width: "80px", textAlign: "center" }}>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {form.workers.map((w, idx) => (
-                        <tr key={idx}>
-                          <td style={{ padding: "6px 12px" }}>
-                            <span className={`badge badge-${w.role === "permanent" ? "green" : w.role === "additional" ? "orange" : "blue"}`} style={{ textTransform: "capitalize", fontSize: "11px", padding: "2px 6px" }}>
-                              {w.role}
-                            </span>
-                          </td>
-                          <td style={{ padding: "6px 12px" }}>
-                            <input 
-                              type="text" 
-                              className="form-input" 
-                              style={{ padding: "4px 8px", fontSize: "13px", height: "30px" }}
-                              placeholder="Worker Name"
-                              value={w.name}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setForm(prev => {
-                                  const list = [...prev.workers];
-                                  list[idx] = { ...list[idx], name: val };
-                                  return { ...prev, workers: list };
-                                });
-                              }}
-                            />
-                          </td>
-                          <td style={{ padding: "6px 12px" }}>
-                            <input 
-                              type="text" 
-                              className="form-input" 
-                              style={{ padding: "4px 8px", fontSize: "13px", height: "30px", fontFamily: "monospace" }}
-                              placeholder="Aadhar Number"
-                              value={w.govt_id}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setForm(prev => {
-                                  const list = [...prev.workers];
-                                  list[idx] = { ...list[idx], govt_id: val };
-                                  return { ...prev, workers: list };
-                                });
-                              }}
-                            />
-                          </td>
-                          <td style={{ padding: "6px 12px", textAlign: "center" }}>
-                            <button 
-                              type="button" 
-                              className="btn btn-icon" 
-                              style={{ color: "var(--danger)" }}
-                              onClick={() => {
-                                setForm(prev => {
-                                  const list = prev.workers.filter((_, i) => i !== idx);
-                                  const key = w.role === "permanent" ? "permanent_manpower" : w.role === "additional" ? "additional_manpower" : "supervisor";
-                                  const newCount = Math.max(0, Number(prev[key] || 0) - 1);
-                                  return {
-                                    ...prev,
-                                    workers: list,
-                                    [key]: newCount
-                                  };
-                                });
-                              }}
-                            >
-                              <FiTrash2 size={13} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-            {msg && <div className="alert alert-error" style={{ marginBottom: "16px" }}>{msg}</div>}
-            <button className="btn btn-primary btn-sm" onClick={handleCreate}><FiCheck size={13} /> Save Entry</button>
-          </div>
-        )}
-
-        {/* Edit form card */}
-        {editId && (
-          <div id="manpower-edit-form-container" className="card" style={{ marginBottom: "20px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", borderBottom: "1px solid var(--border)", paddingBottom: "10px" }}>
-              <span style={{ fontWeight: 700, fontSize: "15px", color: "var(--accent)" }}>
-                ✏️ Edit Man Power Entry — ID #{editId}
-              </span>
-              <button className="btn btn-ghost btn-sm" onClick={() => {
-                const prevId = editId;
-                setEditId(null);
-                setTimeout(() => {
-                  const row = document.getElementById(`manpower-row-${prevId}`);
-                  if (row) {
-                    row.scrollIntoView({ behavior: "smooth", block: "center" });
-                  }
-                }, 100);
-              }}><FiX size={14} /> Cancel</button>
-            </div>
-            <div className="form-grid" style={{ marginBottom: "16px" }}>
-              <div className="form-group">
-                <label className="form-label">Log Date *</label>
-                <input
-                  className="form-input"
-                  type="date"
-                  value={editForm.date}
-                  onChange={(e) => handleDateChange(e.target.value, true)}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Day (Auto)</label>
-                <input
-                  className="form-input"
-                  style={{ background: "var(--bg-muted)", cursor: "not-allowed" }}
-                  type="text"
-                  value={editForm.day}
-                  readOnly
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Month (Auto)</label>
-                <input
-                  className="form-input"
-                  style={{ background: "var(--bg-muted)", cursor: "not-allowed" }}
-                  type="text"
-                  value={editForm.month}
-                  readOnly
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Warehouse Location *</label>
-                <select
-                  className="form-select"
-                  value={editForm.warehouse_location}
-                  onChange={(e) => setEditForm(f => ({ ...f, warehouse_location: e.target.value }))}
-                  disabled={isWarehouseManager()}
-                >
-                  {isWarehouseManager() ? (
-                    <option value={getWarehouseName()}>{getWarehouseName()}</option>
-                  ) : (
-                    <>
-                      <option value="">--Select Warehouse--</option>
-                      {warehouses.map(wh => <option key={wh.id} value={wh.name}>{wh.name}</option>)}
-                    </>
-                  )}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Permanent Manpower *</label>
-                <input
-                  className="form-input"
-                  type="number"
-                  value={editForm.permanent_manpower}
-                  onChange={(e) => handleCountChange("permanent", e.target.value)}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Additional Manpower *</label>
-                <input
-                  className="form-input"
-                  type="number"
-                  value={editForm.additional_manpower}
-                  onChange={(e) => handleCountChange("additional", e.target.value)}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Supervisor Count *</label>
-                <input
-                  className="form-input"
-                  type="number"
-                  value={editForm.supervisor}
-                  onChange={(e) => handleCountChange("supervisor", e.target.value)}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Overtime (hrs) *</label>
-                <input
-                  className="form-input"
-                  type="number"
-                  step="0.5"
-                  value={editForm.overtime_hours}
-                  onChange={(e) => setEditForm(f => ({ ...f, overtime_hours: e.target.value }))}
-                />
-              </div>
-              <div className="form-group" style={{ gridColumn: "span 2" }}>
-                <label className="form-label">Remarks</label>
-                <input
-                  className="form-input"
-                  value={editForm.remarks}
-                  onChange={(e) => setEditForm(f => ({ ...f, remarks: e.target.value }))}
-                />
-              </div>
-            </div>
-
-            {/* Personnel Allocation Section inside the edit form */}
-            <div style={{ marginTop: "24px", borderTop: "1px solid var(--border)", paddingTop: "20px", marginBottom: "20px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "10px" }}>
-                <h4 style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: "var(--text-primary)" }}>
-                  👥 Personnel Details Allocation Directory
-                </h4>
-                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                  <select 
-                    id="new-worker-role-select" 
-                    className="form-select" 
-                    style={{ width: "160px", height: "32px", padding: "0 8px", fontSize: "12px" }}
-                  >
-                    <option value="permanent">Permanent Worker</option>
-                    <option value="additional">Additional Worker</option>
-                    <option value="supervisor">Supervisor</option>
-                  </select>
-                  <button 
-                    type="button" 
-                    className="btn btn-outline btn-sm" 
-                    style={{ height: "32px", padding: "0 10px", fontSize: "12px", display: "flex", alignItems: "center", gap: "4px" }}
-                    onClick={() => {
-                      const role = document.getElementById("new-worker-role-select").value;
-                      const newWorker = {
-                        id: null,
-                        name: "",
-                        govt_id: "",
-                        role: role
-                      };
-                      setEditForm(prev => {
-                        const updatedWorkers = [...(prev.workers || []), newWorker];
-                        const key = role === "permanent" ? "permanent_manpower" : role === "additional" ? "additional_manpower" : "supervisor";
-                        return {
-                          ...prev,
-                          workers: updatedWorkers,
-                          [key]: Number(prev[key] || 0) + 1
-                        };
-                      });
-                    }}
-                  >
-                    <FiPlus size={12} /> Add Worker row
-                  </button>
-                </div>
-              </div>
-
-              {(!editForm.workers || editForm.workers.length === 0) ? (
-                <div style={{ padding: "16px", background: "var(--bg-base)", borderRadius: "6px", textAlign: "center", color: "var(--text-secondary)", fontSize: "13px" }}>
-                  No personnel allocated to this entry yet. Adjust headcounts or click "Add Worker row" above.
-                </div>
-              ) : (
-                <div style={{ maxHeight: "300px", overflowY: "auto", border: "1px solid var(--border)", borderRadius: "6px" }}>
-                  <table className="data-table" style={{ margin: 0, fontSize: "13px" }}>
-                    <thead>
-                      <tr>
-                        <th style={{ padding: "6px 12px" }}>Designation</th>
-                        <th style={{ padding: "6px 12px" }}>Name</th>
-                        <th style={{ padding: "6px 12px" }}>Aadhar Number</th>
-                        <th style={{ padding: "6px 12px", width: "80px", textAlign: "center" }}>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {editForm.workers.map((w, idx) => (
-                        <tr key={idx}>
-                          <td style={{ padding: "6px 12px" }}>
-                            <span className={`badge badge-${w.role === "permanent" ? "green" : w.role === "additional" ? "orange" : "blue"}`} style={{ textTransform: "capitalize", fontSize: "11px", padding: "2px 6px" }}>
-                              {w.role}
-                            </span>
-                          </td>
-                          <td style={{ padding: "6px 12px" }}>
-                            <input 
-                              type="text" 
-                              className="form-input" 
-                              style={{ padding: "4px 8px", fontSize: "13px", height: "30px" }}
-                              placeholder="Worker Name"
-                              value={w.name}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setEditForm(prev => {
-                                  const list = [...prev.workers];
-                                  list[idx] = { ...list[idx], name: val };
-                                  return { ...prev, workers: list };
-                                });
-                              }}
-                            />
-                          </td>
-                          <td style={{ padding: "6px 12px" }}>
-                            <input 
-                              type="text" 
-                              className="form-input" 
-                              style={{ padding: "4px 8px", fontSize: "13px", height: "30px", fontFamily: "monospace" }}
-                              placeholder="Aadhar Number"
-                              value={w.govt_id}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setEditForm(prev => {
-                                  const list = [...prev.workers];
-                                  list[idx] = { ...list[idx], govt_id: val };
-                                  return { ...prev, workers: list };
-                                });
-                              }}
-                            />
-                          </td>
-                          <td style={{ padding: "6px 12px", textAlign: "center" }}>
-                            <button 
-                              type="button" 
-                              className="btn btn-icon" 
-                              style={{ color: "var(--danger)" }}
-                              onClick={() => {
-                                setEditForm(prev => {
-                                  const list = prev.workers.filter((_, i) => i !== idx);
-                                  const key = w.role === "permanent" ? "permanent_manpower" : w.role === "additional" ? "additional_manpower" : "supervisor";
-                                  const newCount = Math.max(0, Number(prev[key] || 0) - 1);
-                                  return {
-                                    ...prev,
-                                    workers: list,
-                                    [key]: newCount
-                                  };
-                                });
-                              }}
-                            >
-                              <FiTrash2 size={13} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            <button className="btn btn-primary btn-sm" onClick={handleUpdate}><FiCheck size={13} /> Save Changes</button>
-          </div>
-        )}
-
-        {/* Dynamic Filters & Metrics Cards */}
-        <div className="card" style={{ marginBottom: "20px", display: "flex", flexDirection: "column", gap: "16px" }}>
-
-          {/* Compact filter row */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "8px", padding: "12px", background: "var(--bg-elevated)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
-            <div>
-              <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Date</div>
-              <input className="form-input" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} type="text" placeholder="e.g. 01/01/2025" value={filterDate} onChange={e => { setFilterDate(e.target.value); setCurrentPage(1); }} />
-            </div>
-            <div>
-              <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Day</div>
-              <select className="form-select" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} value={filterDay} onChange={e => { setFilterDay(e.target.value); setCurrentPage(1); }}>
-                <option value="">All</option>
-                {["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"].map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-            </div>
-            <div>
-              <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Month</div>
-              <select className="form-select" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} value={filterMonth} onChange={e => { setFilterMonth(e.target.value); setCurrentPage(1); }}>
-                <option value="">All</option>
-                {uniqueMonths.map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
-            </div>
-            <div>
-              <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Warehouse Location</div>
-              <select className="form-select" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} value={filterLocation} onChange={e => { setFilterLocation(e.target.value); setCurrentPage(1); }} disabled={isWarehouseManager()}>
-                {isWarehouseManager() ? (
-                  <option value={getWarehouseName()}>{getWarehouseName()}</option>
-                ) : (
-                  <>
-                    <option value="">All</option>
-                    {MANPOWER_LOCATIONS.map(loc => <option key={loc} value={loc}>{loc}</option>)}
-                  </>
-                )}
-              </select>
-            </div>
-            <div>
-              <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Search Remarks</div>
-              <input className="form-input" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} type="text" placeholder="Search..." value={search} onChange={e => { setSearch(e.target.value); setCurrentPage(1); }} />
-            </div>
-            {hasActiveFilters && (
-              <div style={{ display: "flex", alignItems: "flex-end" }}>
-                <button className="btn btn-ghost btn-sm" onClick={clearAllFilters} style={{ color: "var(--danger)", borderColor: "var(--danger)", height: "30px", width: "100%" }}>
-                  <FiX size={12} /> Clear All
-                </button>
+                {msg && <div className="alert alert-error" style={{ marginBottom: "16px" }}>{msg}</div>}
+                <button className="btn btn-primary btn-sm" onClick={handleCreate}><FiCheck size={13} /> Save Entry</button>
               </div>
             )}
-          </div>
 
-          {/* Summary stats */}
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-            gap: "16px"
-          }}>
-            <div 
-              className="interactive-stat-card"
-              onClick={() => { setModalType("permanent"); setModalSearch(""); }}
-              style={{
-                background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: "8px", padding: "16px",
-                display: "flex", flexDirection: "column", gap: "4px"
-              }}
-            >
-              <span style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", letterSpacing: "0.5px", textTransform: "uppercase" }}>
-                ⚙️ Permanent Manpower (Fixed)
-              </span>
-              <span style={{ fontSize: "24px", fontWeight: "800", color: "var(--text-primary)" }}>{totalPermanent}</span>
-            </div>
-
-            <div 
-              className="interactive-stat-card"
-              onClick={() => { setModalType("additional"); setModalSearch(""); }}
-              style={{
-                background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: "8px", padding: "16px",
-                display: "flex", flexDirection: "column", gap: "4px"
-              }}
-            >
-              <span style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", letterSpacing: "0.5px", textTransform: "uppercase" }}>
-                ⚡ Additional Manpower
-              </span>
-              <span style={{ fontSize: "24px", fontWeight: "800", color: "var(--text-primary)" }}>{totalAdditional}</span>
-            </div>
-
-            <div 
-              className="interactive-stat-card"
-              onClick={() => { setModalType("supervisor"); setModalSearch(""); }}
-              style={{
-                background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: "8px", padding: "16px",
-                display: "flex", flexDirection: "column", gap: "4px"
-              }}
-            >
-              <span style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", letterSpacing: "0.5px", textTransform: "uppercase" }}>
-                👤 Total Supervisors
-              </span>
-              <span style={{ fontSize: "24px", fontWeight: "800", color: "var(--text-primary)" }}>{totalSupervisor}</span>
-            </div>
-
-            <div style={{
-              background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: "8px", padding: "16px",
-              display: "flex", flexDirection: "column", gap: "4px"
-            }}>
-              <span style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", letterSpacing: "0.5px", textTransform: "uppercase" }}>
-                🕒 Total Overtime (hrs)
-              </span>
-              <span style={{ fontSize: "24px", fontWeight: "800", color: "var(--text-primary)" }}>{totalOvertime}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Records table */}
-        <div className="card">
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
-            <span style={{ fontWeight: 600, color: "var(--text-primary)", fontSize: "14px" }}>
-              Man Power Allocation Logs ({filtered.length})
-            </span>
-          </div>
-
-          <div style={{ overflowX: "auto" }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>DATE</th>
-                  <th>DAY</th>
-                  <th>MONTH</th>
-                  <th>WAREHOUSE LOCATION</th>
-                  <th>PERMANENT</th>
-                  <th>ADDITIONAL</th>
-                  <th>SUPERVISOR</th>
-                  <th>OVERTIME (HRS)</th>
-                  <th>REMARKS</th>
-                  <th>ACTIONS</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginated.length === 0 ? (
-                  <tr>
-                    <td colSpan={11}>
-                      <div className="empty-state">No man power logs found.</div>
-                    </td>
-                  </tr>
-                ) : (
-                  paginated.map((item, index) => (
-                    <tr id={`manpower-row-${item.id}`} key={item.id}>
-                      <td style={{ color: "var(--text-muted)" }}>{((currentPage - 1) * pageSize) + index + 1}</td>
-                      <td style={{ fontWeight: 500 }}>{item.date}</td>
-                      <td><span className="badge badge-purple">{item.day}</span></td>
-                      <td><span className="badge badge-blue">{item.month}</span></td>
-                      <td style={{ fontWeight: 600, color: "var(--text-primary)" }}>{item.warehouse_location}</td>
-                      <td><span className="badge badge-green" style={{ fontWeight: 700 }}>{item.permanent_manpower}</span></td>
-                      <td><span className="badge badge-orange" style={{ fontWeight: 700 }}>{item.additional_manpower}</span></td>
-                      <td><span className="badge badge-blue" style={{ fontWeight: 700 }}>{item.supervisor}</span></td>
-                      <td><span className="badge badge-red" style={{ fontWeight: 700 }}>{item.overtime_hours}</span></td>
-                      <td>{item.remarks || "—"}</td>
-                      <td>
-                        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                          <button className="btn-icon" title="Edit" onClick={() => startEdit(item)}><FiEdit2 size={13} /></button>
-                          {deleteConfirmId === item.id ? (
-                            <span style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "12px", color: "var(--danger)" }}>
-                              Sure?
-                              <button className="btn-icon" style={{ color: "var(--danger)" }} onClick={() => handleDelete(item.id)}><FiCheck size={13} /></button>
-                              <button className="btn-icon" onClick={() => setDeleteConfirmId(null)}><FiX size={13} /></button>
-                            </span>
-                          ) : (
-                            <button className="btn-icon" title="Delete" style={{ color: "var(--danger)" }} onClick={() => { setDeleteConfirmId(item.id); setEditId(null); }}><FiTrash2 size={13} /></button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "16px", flexWrap: "wrap", gap: "10px" }}>
-              <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
-                Showing {((currentPage - 1) * pageSize) + 1} - {Math.min(currentPage * pageSize, filtered.length)} of {filtered.length} entries
-              </span>
-              <div style={{ display: "flex", gap: "4px" }}>
-                <button className="btn btn-ghost btn-sm" onClick={() => setCurrentPage(p => Math.max(p - 1, 1))} disabled={currentPage === 1}>
-                  Prev
-                </button>
-                <span style={{ fontSize: "12px", fontWeight: "600", padding: "6px 12px", color: "var(--text-primary)" }}>
-                  Page {currentPage} of {totalPages}
-                </span>
-                <button className="btn btn-ghost btn-sm" onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages}>
-                  Next
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Personnel names details modal */}
-        {modalType && (
-          <div 
-            style={{
-              position: "fixed",
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: "rgba(15, 23, 42, 0.4)",
-              backdropFilter: "blur(6px)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              zIndex: 9999,
-              animation: "fadeIn 0.2s ease-out"
-            }}
-            onClick={() => setModalType(null)}
-          >
-            <div 
-              style={{
-                background: "var(--bg-surface)",
-                border: "1px solid var(--border)",
-                borderRadius: "var(--radius-lg)",
-                width: "90%",
-                maxWidth: "780px",
-                maxHeight: "85vh",
-                display: "flex",
-                flexDirection: "column",
-                boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
-                animation: "slideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1)"
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Modal Header */}
-              <div style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "20px 24px",
-                borderBottom: "1px solid var(--border)"
-              }}>
-                <div>
-                  <h3 style={{ fontSize: "16px", fontWeight: 700, color: "var(--text-primary)", display: "flex", gap: "8px", alignItems: "center" }}>
-                    {modalType === "permanent" ? "⚙️ Permanent" : modalType === "additional" ? "⚡ Additional" : "👤 Supervisor"} Personnel Directory
-                  </h3>
-                  <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "2px" }}>
-                    Showing names list for active location/month filters
-                  </p>
+            {/* Edit form card */}
+            {editId && (
+              <div id="manpower-edit-form-container" className="card" style={{ marginBottom: "20px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", borderBottom: "1px solid var(--border)", paddingBottom: "10px" }}>
+                  <span style={{ fontWeight: 700, fontSize: "15px", color: "var(--accent)" }}>
+                    ✏️ Edit Man Power Entry — ID #{editId}
+                  </span>
+                  <button className="btn btn-ghost btn-sm" onClick={() => {
+                    const prevId = editId;
+                    setEditId(null);
+                    setTimeout(() => {
+                      const row = document.getElementById(`manpower-row-${prevId}`);
+                      if (row) {
+                        row.scrollIntoView({ behavior: "smooth", block: "center" });
+                      }
+                    }, 100);
+                  }}><FiX size={14} /> Cancel</button>
                 </div>
-                <button 
-                  onClick={() => setModalType(null)}
-                  style={{ width: "32px", height: "32px", borderRadius: "50%", background: "var(--bg-elevated)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-secondary)" }}
-                >
-                  <FiX size={16} />
-                </button>
-              </div>
-
-              {/* Search & Export Toolbar */}
-              <div style={{
-                padding: "16px 24px",
-                background: "var(--bg-base)",
-                borderBottom: "1px solid var(--border)",
-                display: "flex",
-                gap: "12px",
-                alignItems: "center",
-                justifyContent: "space-between",
-                flexWrap: "wrap"
-              }}>
-                <div style={{
-                  position: "relative",
-                  flex: 1,
-                  minWidth: "220px"
-                }}>
-                  <FiSearch size={14} style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
-                  <input 
-                    placeholder="Search by Aadhar, name, date..."
-                    value={modalSearch}
-                    onChange={(e) => setModalSearch(e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: "8px 12px 8px 36px",
-                      borderRadius: "6px",
-                      border: "1px solid var(--border)",
-                      background: "var(--bg-surface)",
-                      color: "var(--text-primary)",
-                      fontSize: "13px"
-                    }}
-                  />
-                  {modalSearch && (
-                    <FiX 
-                      size={14} 
-                      onClick={() => setModalSearch("")} 
-                      style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", cursor: "pointer" }}
+                <div className="form-grid" style={{ marginBottom: "16px" }}>
+                  <div className="form-group">
+                    <label className="form-label">Log Date *</label>
+                    <input
+                      className="form-input"
+                      type="date"
+                      value={editForm.date}
+                      onChange={(e) => handleDateChange(e.target.value, true)}
                     />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Day (Auto)</label>
+                    <input
+                      className="form-input"
+                      style={{ background: "var(--bg-muted)", cursor: "not-allowed" }}
+                      type="text"
+                      value={editForm.day}
+                      readOnly
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Month (Auto)</label>
+                    <input
+                      className="form-input"
+                      style={{ background: "var(--bg-muted)", cursor: "not-allowed" }}
+                      type="text"
+                      value={editForm.month}
+                      readOnly
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Warehouse Location *</label>
+                    <select
+                      className="form-select"
+                      value={editForm.warehouse_location}
+                      onChange={(e) => setEditForm(f => ({ ...f, warehouse_location: e.target.value }))}
+                      disabled={isWarehouseManager()}
+                    >
+                      {isWarehouseManager() ? (
+                        <option value={getWarehouseName()}>{getWarehouseName()}</option>
+                      ) : (
+                        <>
+                          <option value="">--Select Warehouse--</option>
+                          {warehouses.map(wh => <option key={wh.id} value={wh.name}>{wh.name}</option>)}
+                        </>
+                      )}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Permanent Manpower *</label>
+                    <input
+                      className="form-input"
+                      type="number"
+                      value={editForm.permanent_manpower}
+                      onChange={(e) => handleCountChange("permanent", e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Additional Manpower *</label>
+                    <input
+                      className="form-input"
+                      type="number"
+                      value={editForm.additional_manpower}
+                      onChange={(e) => handleCountChange("additional", e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Supervisor Count *</label>
+                    <input
+                      className="form-input"
+                      type="number"
+                      value={editForm.supervisor}
+                      onChange={(e) => handleCountChange("supervisor", e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Overtime (hrs) *</label>
+                    <input
+                      className="form-input"
+                      type="number"
+                      step="0.5"
+                      value={editForm.overtime_hours}
+                      onChange={(e) => setEditForm(f => ({ ...f, overtime_hours: e.target.value }))}
+                    />
+                  </div>
+                  <div className="form-group" style={{ gridColumn: "span 2" }}>
+                    <label className="form-label">Remarks</label>
+                    <input
+                      className="form-input"
+                      value={editForm.remarks}
+                      onChange={(e) => setEditForm(f => ({ ...f, remarks: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                {/* Personnel Allocation Section inside the edit form */}
+                <div style={{ marginTop: "24px", borderTop: "1px solid var(--border)", paddingTop: "20px", marginBottom: "20px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "10px" }}>
+                    <h4 style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: "var(--text-primary)" }}>
+                      👥 Personnel Details Allocation Directory
+                    </h4>
+                    <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                      <select
+                        id="new-worker-role-select"
+                        className="form-select"
+                        style={{ width: "160px", height: "32px", padding: "0 8px", fontSize: "12px" }}
+                      >
+                        <option value="permanent">Permanent Worker</option>
+                        <option value="additional">Additional Worker</option>
+                        <option value="supervisor">Supervisor</option>
+                      </select>
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm"
+                        style={{ height: "32px", padding: "0 10px", fontSize: "12px", display: "flex", alignItems: "center", gap: "4px" }}
+                        onClick={() => {
+                          const role = document.getElementById("new-worker-role-select").value;
+                          const newWorker = {
+                            id: null,
+                            name: "",
+                            govt_id: "",
+                            role: role
+                          };
+                          setEditForm(prev => {
+                            const updatedWorkers = [...(prev.workers || []), newWorker];
+                            const key = role === "permanent" ? "permanent_manpower" : role === "additional" ? "additional_manpower" : "supervisor";
+                            return {
+                              ...prev,
+                              workers: updatedWorkers,
+                              [key]: Number(prev[key] || 0) + 1
+                            };
+                          });
+                        }}
+                      >
+                        <FiPlus size={12} /> Add Worker row
+                      </button>
+                    </div>
+                  </div>
+
+                  {(!editForm.workers || editForm.workers.length === 0) ? (
+                    <div style={{ padding: "16px", background: "var(--bg-base)", borderRadius: "6px", textAlign: "center", color: "var(--text-secondary)", fontSize: "13px" }}>
+                      No personnel allocated to this entry yet. Adjust headcounts or click "Add Worker row" above.
+                    </div>
+                  ) : (
+                    <div style={{ maxHeight: "300px", overflowY: "auto", border: "1px solid var(--border)", borderRadius: "6px" }}>
+                      <table className="data-table" style={{ margin: 0, fontSize: "13px" }}>
+                        <thead>
+                          <tr>
+                            <th style={{ padding: "6px 12px" }}>Designation</th>
+                            <th style={{ padding: "6px 12px" }}>Name</th>
+                            <th style={{ padding: "6px 12px" }}>Aadhar Number</th>
+                            <th style={{ padding: "6px 12px", width: "80px", textAlign: "center" }}>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {editForm.workers.map((w, idx) => (
+                            <tr key={idx}>
+                              <td style={{ padding: "6px 12px" }}>
+                                <span className={`badge badge-${w.role === "permanent" ? "green" : w.role === "additional" ? "orange" : "blue"}`} style={{ textTransform: "capitalize", fontSize: "11px", padding: "2px 6px" }}>
+                                  {w.role}
+                                </span>
+                              </td>
+                              <td style={{ padding: "6px 12px" }}>
+                                <input
+                                  type="text"
+                                  className="form-input"
+                                  style={{ padding: "4px 8px", fontSize: "13px", height: "30px" }}
+                                  placeholder="Worker Name"
+                                  value={w.name}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setEditForm(prev => {
+                                      const list = [...prev.workers];
+                                      list[idx] = { ...list[idx], name: val };
+                                      return { ...prev, workers: list };
+                                    });
+                                  }}
+                                />
+                              </td>
+                              <td style={{ padding: "6px 12px" }}>
+                                <input
+                                  type="text"
+                                  className="form-input"
+                                  style={{ padding: "4px 8px", fontSize: "13px", height: "30px", fontFamily: "monospace" }}
+                                  placeholder="Aadhar Number"
+                                  value={w.govt_id}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setEditForm(prev => {
+                                      const list = [...prev.workers];
+                                      list[idx] = { ...list[idx], govt_id: val };
+                                      return { ...prev, workers: list };
+                                    });
+                                  }}
+                                />
+                              </td>
+                              <td style={{ padding: "6px 12px", textAlign: "center" }}>
+                                <button
+                                  type="button"
+                                  className="btn btn-icon"
+                                  style={{ color: "var(--danger)" }}
+                                  onClick={() => {
+                                    setEditForm(prev => {
+                                      const list = prev.workers.filter((_, i) => i !== idx);
+                                      const key = w.role === "permanent" ? "permanent_manpower" : w.role === "additional" ? "additional_manpower" : "supervisor";
+                                      const newCount = Math.max(0, Number(prev[key] || 0) - 1);
+                                      return {
+                                        ...prev,
+                                        workers: list,
+                                        [key]: newCount
+                                      };
+                                    });
+                                  }}
+                                >
+                                  <FiTrash2 size={13} />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   )}
                 </div>
-                
-                <div style={{ display: "flex", gap: "8px" }}>
-                  <button 
-                    className="btn btn-outline btn-sm"
-                    onClick={() => {
-                      const headers = ["Aadhar Number", "Name", "Role", "Date", "Location"];
-                      const rows = modalWorkers.filter(w => {
-                        const s = modalSearch.toLowerCase();
-                        return (
-                          (w.govt_id || "").toLowerCase().includes(s) ||
-                          (w.name || "").toLowerCase().includes(s) ||
-                          (w.location || "").toLowerCase().includes(s) ||
-                          (w.date || "").toLowerCase().includes(s)
-                        );
-                      }).map(w => [w.govt_id, w.name, w.role, w.date, w.location]);
-                      const csvContent = [headers, ...rows].map(e => e.map(val => `"${val}"`).join(",")).join("\n");
-                      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-                      const url = URL.createObjectURL(blob);
-                      const link = document.createElement("a");
-                      link.setAttribute("href", url);
-                      link.setAttribute("download", `Manpower_${modalType}_Names_${new Date().toISOString().slice(0,10)}.csv`);
-                      link.style.visibility = 'hidden';
-                      document.body.appendChild(link);
-                      link.click();
-                      document.body.removeChild(link);
-                    }}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      height: "36px"
-                    }}
-                  >
-                    <FiUpload size={13} style={{ transform: "rotate(180deg)" }} /> Export Names
-                  </button>
-                </div>
-              </div>
 
-              {/* Modal Body / Table (View-Only) */}
-              <div style={{
-                flex: 1,
-                overflowY: "auto",
-                padding: "16px 24px"
-              }}>
-                {modalLoading ? (
-                  <div style={{ display: "flex", justifyContent: "center", padding: "40px 10px", color: "var(--text-secondary)", gap: "8px", alignItems: "center" }}>
-                    <div className="spinner" style={{ width: "16px", height: "16px", border: "2px solid var(--border)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }}></div>
-                    Loading personnel details...
+                <button className="btn btn-primary btn-sm" onClick={handleUpdate}><FiCheck size={13} /> Save Changes</button>
+              </div>
+            )}
+
+            {/* Dynamic Filters & Metrics Cards */}
+            <div className="card" style={{ marginBottom: "20px", display: "flex", flexDirection: "column", gap: "16px" }}>
+
+              {/* Compact filter row */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "8px", padding: "12px", background: "var(--bg-elevated)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
+                <div>
+                  <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Date</div>
+                  <input className="form-input" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} type="text" placeholder="e.g. 01/01/2025" value={filterDate} onChange={e => { setFilterDate(e.target.value); setCurrentPage(1); }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Day</div>
+                  <select className="form-select" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} value={filterDay} onChange={e => { setFilterDay(e.target.value); setCurrentPage(1); }}>
+                    <option value="">All</option>
+                    {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Month</div>
+                  <select className="form-select" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} value={filterMonth} onChange={e => { setFilterMonth(e.target.value); setCurrentPage(1); }}>
+                    <option value="">All</option>
+                    {uniqueMonths.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Warehouse Location</div>
+                  <select className="form-select" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} value={filterLocation} onChange={e => { setFilterLocation(e.target.value); setCurrentPage(1); }} disabled={isWarehouseManager()}>
+                    {isWarehouseManager() ? (
+                      <option value={getWarehouseName()}>{getWarehouseName()}</option>
+                    ) : (
+                      <>
+                        <option value="">All</option>
+                        {MANPOWER_LOCATIONS.map(loc => <option key={loc} value={loc}>{loc}</option>)}
+                      </>
+                    )}
+                  </select>
+                </div>
+                <div>
+                  <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Search Remarks</div>
+                  <input className="form-input" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} type="text" placeholder="Search..." value={search} onChange={e => { setSearch(e.target.value); setCurrentPage(1); }} />
+                </div>
+                {hasActiveFilters && (
+                  <div style={{ display: "flex", alignItems: "flex-end" }}>
+                    <button className="btn btn-ghost btn-sm" onClick={clearAllFilters} style={{ color: "var(--danger)", borderColor: "var(--danger)", height: "30px", width: "100%" }}>
+                      <FiX size={12} /> Clear All
+                    </button>
                   </div>
-                ) : (
-                  <table className="data-table" style={{ margin: 0 }}>
-                    <thead>
-                      <tr>
-                        <th style={{ padding: "8px 12px", fontSize: "11px" }}>#</th>
-                        <th style={{ padding: "8px 12px", fontSize: "11px" }}>AADHAR NUMBER</th>
-                        <th style={{ padding: "8px 12px", fontSize: "11px" }}>NAME</th>
-                        <th style={{ padding: "8px 12px", fontSize: "11px" }}>DESIGNATION</th>
-                        <th style={{ padding: "8px 12px", fontSize: "11px" }}>ALLOCATION DATE</th>
-                        <th style={{ padding: "8px 12px", fontSize: "11px" }}>LOCATION</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {modalWorkers.filter(w => {
-                        const s = modalSearch.toLowerCase();
-                        return (
-                          (w.govt_id || "").toLowerCase().includes(s) ||
-                          (w.name || "").toLowerCase().includes(s) ||
-                          (w.location || "").toLowerCase().includes(s) ||
-                          (w.date || "").toLowerCase().includes(s)
-                        );
-                      }).length === 0 ? (
-                        <tr>
-                          <td colSpan={6} style={{ textAlign: "center", padding: "30px 10px", color: "var(--text-muted)" }}>
-                            No workers matched your search.
-                          </td>
-                        </tr>
-                      ) : (
-                        modalWorkers.filter(w => {
-                          const s = modalSearch.toLowerCase();
-                          return (
-                            (w.govt_id || "").toLowerCase().includes(s) ||
-                            (w.name || "").toLowerCase().includes(s) ||
-                            (w.location || "").toLowerCase().includes(s) ||
-                            (w.date || "").toLowerCase().includes(s)
-                          );
-                        }).map((w, idx) => (
-                          <tr key={w.id}>
-                            <td style={{ padding: "10px 12px", color: "var(--text-muted)", fontSize: "12px" }}>{idx + 1}</td>
-                            <td style={{ padding: "10px 12px", fontWeight: "600", fontSize: "12px" }}>
-                              <span style={{ fontFamily: "monospace", letterSpacing: "0.2px" }}>{w.govt_id || "—"}</span>
-                            </td>
-                            <td style={{ padding: "10px 12px", fontWeight: "500", color: "var(--text-primary)", fontSize: "12px" }}>
-                              {w.name || "—"}
-                            </td>
-                            <td style={{ padding: "10px 12px", fontSize: "12px" }}>
-                              <span className={`badge badge-${modalType === "permanent" ? "green" : modalType === "additional" ? "orange" : "blue"}`} style={{ padding: "2px 6px", fontSize: "10px" }}>
-                                {w.role === "permanent" ? "Permanent Worker" : w.role === "additional" ? "Additional Worker" : "Supervisor"}
-                              </span>
-                            </td>
-                            <td style={{ padding: "10px 12px", fontSize: "12px" }}>{w.date}</td>
-                            <td style={{ padding: "10px 12px", fontWeight: "500", fontSize: "12px" }}>{w.location}</td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
                 )}
               </div>
 
-              {/* Modal Footer */}
+              {/* Summary stats */}
               <div style={{
-                padding: "16px 24px",
-                borderTop: "1px solid var(--border)",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                background: "var(--bg-base)"
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                gap: "16px"
               }}>
-                <span style={{ fontSize: "12px", color: "var(--text-secondary)", fontWeight: 500 }}>
-                  Total Count: {modalWorkers.filter(w => {
-                    const s = modalSearch.toLowerCase();
-                    return (
-                      (w.govt_id || "").toLowerCase().includes(s) ||
-                      (w.name || "").toLowerCase().includes(s) ||
-                      (w.location || "").toLowerCase().includes(s) ||
-                      (w.date || "").toLowerCase().includes(s)
-                    );
-                  }).length} personnel
-                </span>
-                <button 
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => setModalType(null)}
+                <div
+                  className="interactive-stat-card"
+                  onClick={() => { setModalType("permanent"); setModalSearch(""); }}
+                  style={{
+                    background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: "8px", padding: "16px",
+                    display: "flex", flexDirection: "column", gap: "4px"
+                  }}
                 >
-                  Close
-                </button>
+                  <span style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", letterSpacing: "0.5px", textTransform: "uppercase" }}>
+                    ⚙️ Permanent Manpower (Fixed)
+                  </span>
+                  <span style={{ fontSize: "24px", fontWeight: "800", color: "var(--text-primary)" }}>{totalPermanent}</span>
+                </div>
+
+                <div
+                  className="interactive-stat-card"
+                  onClick={() => { setModalType("additional"); setModalSearch(""); }}
+                  style={{
+                    background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: "8px", padding: "16px",
+                    display: "flex", flexDirection: "column", gap: "4px"
+                  }}
+                >
+                  <span style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", letterSpacing: "0.5px", textTransform: "uppercase" }}>
+                    ⚡ Additional Manpower
+                  </span>
+                  <span style={{ fontSize: "24px", fontWeight: "800", color: "var(--text-primary)" }}>{totalAdditional}</span>
+                </div>
+
+                <div
+                  className="interactive-stat-card"
+                  onClick={() => { setModalType("supervisor"); setModalSearch(""); }}
+                  style={{
+                    background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: "8px", padding: "16px",
+                    display: "flex", flexDirection: "column", gap: "4px"
+                  }}
+                >
+                  <span style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", letterSpacing: "0.5px", textTransform: "uppercase" }}>
+                    👤 Total Supervisors
+                  </span>
+                  <span style={{ fontSize: "24px", fontWeight: "800", color: "var(--text-primary)" }}>{totalSupervisor}</span>
+                </div>
+
+                <div style={{
+                  background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: "8px", padding: "16px",
+                  display: "flex", flexDirection: "column", gap: "4px"
+                }}>
+                  <span style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", letterSpacing: "0.5px", textTransform: "uppercase" }}>
+                    🕒 Total Overtime (hrs)
+                  </span>
+                  <span style={{ fontSize: "24px", fontWeight: "800", color: "var(--text-primary)" }}>{totalOvertime}</span>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+
+            {/* Records table */}
+            <div className="card">
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
+                <span style={{ fontWeight: 600, color: "var(--text-primary)", fontSize: "14px" }}>
+                  Man Power Allocation Logs ({filtered.length})
+                </span>
+              </div>
+
+              <div style={{ overflowX: "auto" }}>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>DATE</th>
+                      <th>DAY</th>
+                      <th>MONTH</th>
+                      <th>WAREHOUSE LOCATION</th>
+                      <th>PERMANENT</th>
+                      <th>ADDITIONAL</th>
+                      <th>SUPERVISOR</th>
+                      <th>OVERTIME (HRS)</th>
+                      <th>REMARKS</th>
+                      {!isReadOnly() && <th>ACTIONS</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginated.length === 0 ? (
+                      <tr>
+                        <td colSpan={11}>
+                          <div className="empty-state">No man power logs found.</div>
+                        </td>
+                      </tr>
+                    ) : (
+                      paginated.map((item, index) => (
+                        <tr id={`manpower-row-${item.id}`} key={item.id}>
+                          <td style={{ color: "var(--text-muted)" }}>{((currentPage - 1) * pageSize) + index + 1}</td>
+                          <td style={{ fontWeight: 500 }}>{item.date}</td>
+                          <td><span className="badge badge-purple">{item.day}</span></td>
+                          <td><span className="badge badge-blue">{item.month}</span></td>
+                          <td style={{ fontWeight: 600, color: "var(--text-primary)" }}>{item.warehouse_location}</td>
+                          <td><span className="badge badge-green" style={{ fontWeight: 700 }}>{item.permanent_manpower}</span></td>
+                          <td><span className="badge badge-orange" style={{ fontWeight: 700 }}>{item.additional_manpower}</span></td>
+                          <td><span className="badge badge-blue" style={{ fontWeight: 700 }}>{item.supervisor}</span></td>
+                          <td><span className="badge badge-red" style={{ fontWeight: 700 }}>{item.overtime_hours}</span></td>
+                          <td>{item.remarks || "—"}</td>
+                          {!isReadOnly() && (
+                            <td>
+                              <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                                <button className="btn-icon" title="Edit" onClick={() => startEdit(item)}><FiEdit2 size={13} /></button>
+                                {canDelete() && (
+                                  deleteConfirmId === item.id ? (
+                                    <span style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "12px", color: "var(--danger)" }}>
+                                      Sure?
+                                      <button className="btn-icon" style={{ color: "var(--danger)" }} onClick={() => handleDelete(item.id)}><FiCheck size={13} /></button>
+                                      <button className="btn-icon" onClick={() => setDeleteConfirmId(null)}><FiX size={13} /></button>
+                                    </span>
+                                  ) : (
+                                    <button className="btn-icon" title="Delete" style={{ color: "var(--danger)" }} onClick={() => { setDeleteConfirmId(item.id); setEditId(null); }}><FiTrash2 size={13} /></button>
+                                  )
+                                )}
+                              </div>
+                            </td>
+                          )}
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "16px", flexWrap: "wrap", gap: "10px" }}>
+                  <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                    Showing {((currentPage - 1) * pageSize) + 1} - {Math.min(currentPage * pageSize, filtered.length)} of {filtered.length} entries
+                  </span>
+                  <div style={{ display: "flex", gap: "4px" }}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setCurrentPage(p => Math.max(p - 1, 1))} disabled={currentPage === 1}>
+                      Prev
+                    </button>
+                    <span style={{ fontSize: "12px", fontWeight: "600", padding: "6px 12px", color: "var(--text-primary)" }}>
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages}>
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Personnel names details modal */}
+            {modalType && (
+              <div
+                style={{
+                  position: "fixed",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: "rgba(15, 23, 42, 0.4)",
+                  backdropFilter: "blur(6px)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 9999,
+                  animation: "fadeIn 0.2s ease-out"
+                }}
+                onClick={() => setModalType(null)}
+              >
+                <div
+                  style={{
+                    background: "var(--bg-surface)",
+                    border: "1px solid var(--border)",
+                    borderRadius: "var(--radius-lg)",
+                    width: "90%",
+                    maxWidth: "780px",
+                    maxHeight: "85vh",
+                    display: "flex",
+                    flexDirection: "column",
+                    boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+                    animation: "slideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1)"
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Modal Header */}
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "20px 24px",
+                    borderBottom: "1px solid var(--border)"
+                  }}>
+                    <div>
+                      <h3 style={{ fontSize: "16px", fontWeight: 700, color: "var(--text-primary)", display: "flex", gap: "8px", alignItems: "center" }}>
+                        {modalType === "permanent" ? "⚙️ Permanent" : modalType === "additional" ? "⚡ Additional" : "👤 Supervisor"} Personnel Directory
+                      </h3>
+                      <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "2px" }}>
+                        Showing names list for active location/month filters
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setModalType(null)}
+                      style={{ width: "32px", height: "32px", borderRadius: "50%", background: "var(--bg-elevated)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-secondary)" }}
+                    >
+                      <FiX size={16} />
+                    </button>
+                  </div>
+
+                  {/* Search & Export Toolbar */}
+                  <div style={{
+                    padding: "16px 24px",
+                    background: "var(--bg-base)",
+                    borderBottom: "1px solid var(--border)",
+                    display: "flex",
+                    gap: "12px",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    flexWrap: "wrap"
+                  }}>
+                    <div style={{
+                      position: "relative",
+                      flex: 1,
+                      minWidth: "220px"
+                    }}>
+                      <FiSearch size={14} style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
+                      <input
+                        placeholder="Search by Aadhar, name, date..."
+                        value={modalSearch}
+                        onChange={(e) => setModalSearch(e.target.value)}
+                        style={{
+                          width: "100%",
+                          padding: "8px 12px 8px 36px",
+                          borderRadius: "6px",
+                          border: "1px solid var(--border)",
+                          background: "var(--bg-surface)",
+                          color: "var(--text-primary)",
+                          fontSize: "13px"
+                        }}
+                      />
+                      {modalSearch && (
+                        <FiX
+                          size={14}
+                          onClick={() => setModalSearch("")}
+                          style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", cursor: "pointer" }}
+                        />
+                      )}
+                    </div>
+
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button
+                        className="btn btn-outline btn-sm"
+                        onClick={() => {
+                          const headers = ["Aadhar Number", "Name", "Role", "Date", "Location"];
+                          const rows = modalWorkers.filter(w => {
+                            const s = modalSearch.toLowerCase();
+                            return (
+                              (w.govt_id || "").toLowerCase().includes(s) ||
+                              (w.name || "").toLowerCase().includes(s) ||
+                              (w.location || "").toLowerCase().includes(s) ||
+                              (w.date || "").toLowerCase().includes(s)
+                            );
+                          }).map(w => [w.govt_id, w.name, w.role, w.date, w.location]);
+                          const csvContent = [headers, ...rows].map(e => e.map(val => `"${val}"`).join(",")).join("\n");
+                          const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+                          const url = URL.createObjectURL(blob);
+                          const link = document.createElement("a");
+                          link.setAttribute("href", url);
+                          link.setAttribute("download", `Manpower_${modalType}_Names_${new Date().toISOString().slice(0, 10)}.csv`);
+                          link.style.visibility = 'hidden';
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                        }}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          height: "36px"
+                        }}
+                      >
+                        <FiUpload size={13} style={{ transform: "rotate(180deg)" }} /> Export Names
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Modal Body / Table (View-Only) */}
+                  <div style={{
+                    flex: 1,
+                    overflowY: "auto",
+                    padding: "16px 24px"
+                  }}>
+                    {modalLoading ? (
+                      <div style={{ display: "flex", justifyContent: "center", padding: "40px 10px", color: "var(--text-secondary)", gap: "8px", alignItems: "center" }}>
+                        <div className="spinner" style={{ width: "16px", height: "16px", border: "2px solid var(--border)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }}></div>
+                        Loading personnel details...
+                      </div>
+                    ) : (
+                      <table className="data-table" style={{ margin: 0 }}>
+                        <thead>
+                          <tr>
+                            <th style={{ padding: "8px 12px", fontSize: "11px" }}>#</th>
+                            <th style={{ padding: "8px 12px", fontSize: "11px" }}>AADHAR NUMBER</th>
+                            <th style={{ padding: "8px 12px", fontSize: "11px" }}>NAME</th>
+                            <th style={{ padding: "8px 12px", fontSize: "11px" }}>DESIGNATION</th>
+                            <th style={{ padding: "8px 12px", fontSize: "11px" }}>ALLOCATION DATE</th>
+                            <th style={{ padding: "8px 12px", fontSize: "11px" }}>LOCATION</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {modalWorkers.filter(w => {
+                            const s = modalSearch.toLowerCase();
+                            return (
+                              (w.govt_id || "").toLowerCase().includes(s) ||
+                              (w.name || "").toLowerCase().includes(s) ||
+                              (w.location || "").toLowerCase().includes(s) ||
+                              (w.date || "").toLowerCase().includes(s)
+                            );
+                          }).length === 0 ? (
+                            <tr>
+                              <td colSpan={6} style={{ textAlign: "center", padding: "30px 10px", color: "var(--text-muted)" }}>
+                                No workers matched your search.
+                              </td>
+                            </tr>
+                          ) : (
+                            modalWorkers.filter(w => {
+                              const s = modalSearch.toLowerCase();
+                              return (
+                                (w.govt_id || "").toLowerCase().includes(s) ||
+                                (w.name || "").toLowerCase().includes(s) ||
+                                (w.location || "").toLowerCase().includes(s) ||
+                                (w.date || "").toLowerCase().includes(s)
+                              );
+                            }).map((w, idx) => (
+                              <tr key={w.id}>
+                                <td style={{ padding: "10px 12px", color: "var(--text-muted)", fontSize: "12px" }}>{idx + 1}</td>
+                                <td style={{ padding: "10px 12px", fontWeight: "600", fontSize: "12px" }}>
+                                  <span style={{ fontFamily: "monospace", letterSpacing: "0.2px" }}>{w.govt_id || "—"}</span>
+                                </td>
+                                <td style={{ padding: "10px 12px", fontWeight: "500", color: "var(--text-primary)", fontSize: "12px" }}>
+                                  {w.name || "—"}
+                                </td>
+                                <td style={{ padding: "10px 12px", fontSize: "12px" }}>
+                                  <span className={`badge badge-${modalType === "permanent" ? "green" : modalType === "additional" ? "orange" : "blue"}`} style={{ padding: "2px 6px", fontSize: "10px" }}>
+                                    {w.role === "permanent" ? "Permanent Worker" : w.role === "additional" ? "Additional Worker" : "Supervisor"}
+                                  </span>
+                                </td>
+                                <td style={{ padding: "10px 12px", fontSize: "12px" }}>{w.date}</td>
+                                <td style={{ padding: "10px 12px", fontWeight: "500", fontSize: "12px" }}>{w.location}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+
+                  {/* Modal Footer */}
+                  <div style={{
+                    padding: "16px 24px",
+                    borderTop: "1px solid var(--border)",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    background: "var(--bg-base)"
+                  }}>
+                    <span style={{ fontSize: "12px", color: "var(--text-secondary)", fontWeight: 500 }}>
+                      Total Count: {modalWorkers.filter(w => {
+                        const s = modalSearch.toLowerCase();
+                        return (
+                          (w.govt_id || "").toLowerCase().includes(s) ||
+                          (w.name || "").toLowerCase().includes(s) ||
+                          (w.location || "").toLowerCase().includes(s) ||
+                          (w.date || "").toLowerCase().includes(s)
+                        );
+                      }).length} personnel
+                    </span>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => setModalType(null)}
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         )}
 

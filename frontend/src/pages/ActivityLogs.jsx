@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import Loader from "../components/Loader";
 import Navbar from "../components/Navbar";
 import api from "../api/api";
-import { FiSearch, FiX, FiActivity } from "react-icons/fi";
+import { FiSearch, FiX, FiActivity, FiEye } from "react-icons/fi";
+import { isReadOnly } from "../utils/auth";
 
 function ActivityLogs() {
   const [logs, setLogs] = useState([]);
@@ -103,6 +104,22 @@ function ActivityLogs() {
     <div className="page-layout">
       <Navbar />
       <div className="page-content">
+        
+        {/* Read-only banner for superadmin */}
+        {isReadOnly() && (
+          <div className="alert" style={{
+            background: "rgba(245,158,11,0.1)",
+            border: "1px solid rgba(245,158,11,0.3)",
+            color: "#f59e0b",
+            marginBottom: "16px",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px"
+          }}>
+            <FiEye size={14} style={{ flexShrink: 0 }} />
+            <span>You are viewing as <strong>Super Admin</strong> — read-only mode. No changes can be made.</span>
+          </div>
+        )}
         
         {/* Header */}
         <div className="page-header">

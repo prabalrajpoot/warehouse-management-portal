@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import Loader from "../components/Loader";
 import Navbar from "../components/Navbar";
 import api from "../api/api";
-import { FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch } from "react-icons/fi";
+import { FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch, FiEye } from "react-icons/fi";
+import { isReadOnly } from "../utils/auth";
 
 const FIRM_OPTIONS = ["ITI", "PTL", "VTL"];
 
@@ -251,14 +252,32 @@ function SampleInspection() {
       <Navbar />
       <div className="page-content">
 
+        {/* Read-only banner for superadmin */}
+        {isReadOnly() && (
+          <div className="alert" style={{
+            background: "rgba(245,158,11,0.1)",
+            border: "1px solid rgba(245,158,11,0.3)",
+            color: "#f59e0b",
+            marginBottom: "16px",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px"
+          }}>
+            <FiEye size={14} style={{ flexShrink: 0 }} />
+            <span>You are viewing as <strong>Super Admin</strong> — read-only mode. No changes can be made.</span>
+          </div>
+        )}
+
         <div className="page-header">
           <div>
             <h1 className="page-title">Sample Inspection Log</h1>
             <p className="page-subtitle">Track quality inspections of toolkit samples before final dispatch approval</p>
           </div>
-          <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setEditId(null); setMsg(""); }}>
-            <FiPlus size={14} /> {showForm ? "Cancel" : "Add Sample Log"}
-          </button>
+          {!isReadOnly() && (
+            <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setEditId(null); setMsg(""); }}>
+              <FiPlus size={14} /> {showForm ? "Cancel" : "Add Sample Log"}
+            </button>
+          )}
         </div>
 
         {/* Tabs */}
@@ -270,228 +289,229 @@ function SampleInspection() {
             ✅ Sample Approved
           </button>
         </div>
-
         {loading ? (
           <Loader message="Loading sample inspections..." />
         ) : (
           <>
             {/* New entry form */}
-            {showForm && (
-          <div className="card" style={{ marginBottom: "20px" }}>
-            <div className="card-title">New Sample Inspection Entry</div>
-            <div className="form-grid" style={{ marginBottom: "16px" }}>
-              <div className="form-group">
-                <label className="form-label">Inspection Date *</label>
-                <input className="form-input" type="date" value={form.date} onChange={(e) => setForm(f => ({ ...f, date: e.target.value }))} />
+            {showForm && !isReadOnly() && (
+              <div className="card" style={{ marginBottom: "20px" }}>
+                <div className="card-title">New Sample Inspection Entry</div>
+                <div className="form-grid" style={{ marginBottom: "16px" }}>
+                  <div className="form-group">
+                    <label className="form-label">Inspection Date *</label>
+                    <input className="form-input" type="date" value={form.date} onChange={(e) => setForm(f => ({ ...f, date: e.target.value }))} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Firm *</label>
+                    <select className="form-select" value={form.firm} onChange={(e) => setForm(f => ({ ...f, firm: e.target.value, trade: "" }))}>
+                      <option value="">--Select Firm--</option>
+                      {FIRM_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Warehouse Name *</label>
+                    <select className="form-select" value={form.warehouse_name} onChange={(e) => setForm(f => ({ ...f, warehouse_name: e.target.value }))}>
+                      <option value="">--Select Warehouse--</option>
+                      {warehouses.map(wh => <option key={wh.id} value={wh.name}>{wh.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Trade *</label>
+                    <select className="form-select" value={form.trade} onChange={(e) => setForm(f => ({ ...f, trade: e.target.value }))} disabled={!form.firm}>
+                      <option value="">--Select Trade--</option>
+                      {availableTradesForForm.map(trd => <option key={trd} value={trd}>{trd}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Sample Name *</label>
+                    <input className="form-input" placeholder="e.g. Stone Polisher Wheel" value={form.sample_name} onChange={(e) => setForm(f => ({ ...f, sample_name: e.target.value }))} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Quantity</label>
+                    <input className="form-input" type="number" value={form.quantity} onChange={(e) => setForm(f => ({ ...f, quantity: e.target.value }))} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Inspection Status</label>
+                    <select className="form-select" value={form.status} onChange={(e) => setForm(f => ({ ...f, status: e.target.value }))}>
+                      <option value="Pending">Pending</option>
+                      <option value="Approved">Approved</option>
+                      <option value="Rejected">Rejected</option>
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ gridColumn: "span 2" }}>
+                    <label className="form-label">Remarks</label>
+                    <input className="form-input" placeholder="Feedback or findings details" value={form.remarks} onChange={(e) => setForm(f => ({ ...f, remarks: e.target.value }))} />
+                  </div>
+                </div>
+                {msg && <div className="alert alert-error">{msg}</div>}
+                <button className="btn btn-primary btn-sm" onClick={handleCreate}><FiCheck size={13} /> Save Entry</button>
               </div>
-              <div className="form-group">
-                <label className="form-label">Firm *</label>
-                <select className="form-select" value={form.firm} onChange={(e) => setForm(f => ({ ...f, firm: e.target.value, trade: "" }))}>
-                  <option value="">--Select Firm--</option>
-                  {FIRM_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Warehouse Name *</label>
-                <select className="form-select" value={form.warehouse_name} onChange={(e) => setForm(f => ({ ...f, warehouse_name: e.target.value }))}>
-                  <option value="">--Select Warehouse--</option>
-                  {warehouses.map(wh => <option key={wh.id} value={wh.name}>{wh.name}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Trade *</label>
-                <select className="form-select" value={form.trade} onChange={(e) => setForm(f => ({ ...f, trade: e.target.value }))} disabled={!form.firm}>
-                  <option value="">--Select Trade--</option>
-                  {availableTradesForForm.map(trd => <option key={trd} value={trd}>{trd}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Sample Name *</label>
-                <input className="form-input" placeholder="e.g. Stone Polisher Wheel" value={form.sample_name} onChange={(e) => setForm(f => ({ ...f, sample_name: e.target.value }))} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Quantity</label>
-                <input className="form-input" type="number" value={form.quantity} onChange={(e) => setForm(f => ({ ...f, quantity: e.target.value }))} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Inspection Status</label>
-                <select className="form-select" value={form.status} onChange={(e) => setForm(f => ({ ...f, status: e.target.value }))}>
-                  <option value="Pending">Pending</option>
-                  <option value="Approved">Approved</option>
-                  <option value="Rejected">Rejected</option>
-                </select>
-              </div>
-              <div className="form-group" style={{ gridColumn: "span 2" }}>
-                <label className="form-label">Remarks</label>
-                <input className="form-input" placeholder="Feedback or findings details" value={form.remarks} onChange={(e) => setForm(f => ({ ...f, remarks: e.target.value }))} />
-              </div>
-            </div>
-            {msg && <div className="alert alert-error">{msg}</div>}
-            <button className="btn btn-primary btn-sm" onClick={handleCreate}><FiCheck size={13} /> Save Entry</button>
-          </div>
-        )}
+            )}
 
-        {/* Edit form card */}
-        {editId && (
-          <div id="sample-edit-form-container" className="card" style={{ marginBottom: "20px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", borderBottom: "1px solid var(--border)", paddingBottom: "10px" }}>
-              <span style={{ fontWeight: 700, fontSize: "15px", color: "var(--accent)" }}>
-                ✏️ Edit Sample Entry — ID #{editId}
-              </span>
-              <button className="btn btn-ghost btn-sm" onClick={() => {
-                const prevId = editId;
-                setEditId(null);
-                setTimeout(() => {
-                  const row = document.getElementById(`sample-row-${prevId}`);
-                  if (row) {
-                    row.scrollIntoView({ behavior: "smooth", block: "center" });
-                  }
-                }, 100);
-              }}><FiX size={14} /> Cancel</button>
-            </div>
-            <div className="form-grid" style={{ marginBottom: "16px" }}>
-              <div className="form-group">
-                <label className="form-label">Inspection Date *</label>
-                <input className="form-input" type="date" value={editForm.date} onChange={(e) => setEditForm(f => ({ ...f, date: e.target.value }))} />
+            {/* Edit form card */}
+            {editId && !isReadOnly() && (
+              <div id="sample-edit-form-container" className="card" style={{ marginBottom: "20px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", borderBottom: "1px solid var(--border)", paddingBottom: "10px" }}>
+                  <span style={{ fontWeight: 700, fontSize: "15px", color: "var(--accent)" }}>
+                    ✏️ Edit Sample Entry — ID #{editId}
+                  </span>
+                  <button className="btn btn-ghost btn-sm" onClick={() => {
+                    const prevId = editId;
+                    setEditId(null);
+                    setTimeout(() => {
+                      const row = document.getElementById(`sample-row-${prevId}`);
+                      if (row) {
+                        row.scrollIntoView({ behavior: "smooth", block: "center" });
+                      }
+                    }, 100);
+                  }}><FiX size={14} /> Cancel</button>
+                </div>
+                <div className="form-grid" style={{ marginBottom: "16px" }}>
+                  <div className="form-group">
+                    <label className="form-label">Inspection Date *</label>
+                    <input className="form-input" type="date" value={editForm.date} onChange={(e) => setEditForm(f => ({ ...f, date: e.target.value }))} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Firm *</label>
+                    <select className="form-select" value={editForm.firm} onChange={(e) => setEditForm(f => ({ ...f, firm: e.target.value, trade: "" }))}>
+                      <option value="">--Select Firm--</option>
+                      {FIRM_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Warehouse Name *</label>
+                    <select className="form-select" value={editForm.warehouse_name} onChange={(e) => setEditForm(f => ({ ...f, warehouse_name: e.target.value }))}>
+                      <option value="">--Select Warehouse--</option>
+                      {warehouses.map(wh => <option key={wh.id} value={wh.name}>{wh.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Trade *</label>
+                    <select className="form-select" value={editForm.trade} onChange={(e) => setEditForm(f => ({ ...f, trade: e.target.value }))} disabled={!editForm.firm}>
+                      <option value="">--Select Trade--</option>
+                      {availableTradesForEdit.map(trd => <option key={trd} value={trd}>{trd}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Sample Name *</label>
+                    <input className="form-input" value={editForm.sample_name} onChange={(e) => setEditForm(f => ({ ...f, sample_name: e.target.value }))} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Quantity</label>
+                    <input className="form-input" type="number" value={editForm.quantity} onChange={(e) => setEditForm(f => ({ ...f, quantity: e.target.value }))} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Inspection Status</label>
+                    <select className="form-select" value={editForm.status} onChange={(e) => setEditForm(f => ({ ...f, status: e.target.value }))}>
+                      <option value="Pending">Pending</option>
+                      <option value="Approved">Approved</option>
+                      <option value="Rejected">Rejected</option>
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ gridColumn: "span 2" }}>
+                    <label className="form-label">Remarks</label>
+                    <input className="form-input" value={editForm.remarks} onChange={(e) => setEditForm(f => ({ ...f, remarks: e.target.value }))} />
+                  </div>
+                </div>
+                <button className="btn btn-primary btn-sm" onClick={handleUpdate}><FiCheck size={13} /> Save Changes</button>
               </div>
-              <div className="form-group">
-                <label className="form-label">Firm *</label>
-                <select className="form-select" value={editForm.firm} onChange={(e) => setEditForm(f => ({ ...f, firm: e.target.value, trade: "" }))}>
-                  <option value="">--Select Firm--</option>
-                  {FIRM_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Warehouse Name *</label>
-                <select className="form-select" value={editForm.warehouse_name} onChange={(e) => setEditForm(f => ({ ...f, warehouse_name: e.target.value }))}>
-                  <option value="">--Select Warehouse--</option>
-                  {warehouses.map(wh => <option key={wh.id} value={wh.name}>{wh.name}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Trade *</label>
-                <select className="form-select" value={editForm.trade} onChange={(e) => setEditForm(f => ({ ...f, trade: e.target.value }))} disabled={!editForm.firm}>
-                  <option value="">--Select Trade--</option>
-                  {availableTradesForEdit.map(trd => <option key={trd} value={trd}>{trd}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Sample Name *</label>
-                <input className="form-input" value={editForm.sample_name} onChange={(e) => setEditForm(f => ({ ...f, sample_name: e.target.value }))} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Quantity</label>
-                <input className="form-input" type="number" value={editForm.quantity} onChange={(e) => setEditForm(f => ({ ...f, quantity: e.target.value }))} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Inspection Status</label>
-                <select className="form-select" value={editForm.status} onChange={(e) => setEditForm(f => ({ ...f, status: e.target.value }))}>
-                  <option value="Pending">Pending</option>
-                  <option value="Approved">Approved</option>
-                  <option value="Rejected">Rejected</option>
-                </select>
-              </div>
-              <div className="form-group" style={{ gridColumn: "span 2" }}>
-                <label className="form-label">Remarks</label>
-                <input className="form-input" value={editForm.remarks} onChange={(e) => setEditForm(f => ({ ...f, remarks: e.target.value }))} />
-              </div>
-            </div>
-            <button className="btn btn-primary btn-sm" onClick={handleUpdate}><FiCheck size={13} /> Save Changes</button>
-          </div>
-        )}
+            )}
 
-        {/* Records table */}
-        <div className="card">
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
-            <span style={{ fontWeight: 600, color: "var(--text-primary)", fontSize: "14px" }}>
-              {activeTab === "factory" ? "Factory Sample Logs" : "Sample Approved Logs"} ({filtered.length})
-            </span>
-            <div className="search-bar">
-              <FiSearch size={14} />
-              <input placeholder="Search sample, warehouse, trade..." value={search} onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }} />
-            </div>
-          </div>
-
-          <div style={{ overflowX: "auto" }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>INSPECTION DATE</th>
-                  <th>FIRM</th>
-                  <th>WAREHOUSE</th>
-                  <th>TRADE</th>
-                  <th>SAMPLE NAME</th>
-                  <th>QTY</th>
-                  <th>STATUS</th>
-                  <th>REMARKS</th>
-                  <th>ACTIONS</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginated.length === 0 ? (
-                  <tr>
-                    <td colSpan={10}>
-                      <div className="empty-state">No sample inspection records found.</div>
-                    </td>
-                  </tr>
-                ) : (
-                  paginated.map((item, index) => (
-                    <tr id={`sample-row-${item.id}`} key={item.id}>
-                      <td style={{ color: "var(--text-muted)" }}>{((currentPage - 1) * pageSize) + index + 1}</td>
-                      <td style={{ fontWeight: 500 }}>{item.date}</td>
-                      <td>{item.firm}</td>
-                      <td>{item.warehouse_name}</td>
-                      <td><span className="badge badge-purple">{item.trade}</span></td>
-                      <td style={{ fontWeight: 600, color: "var(--text-primary)" }}>{item.sample_name}</td>
-                      <td><span className="badge badge-blue">{item.quantity}</span></td>
-                      <td>
-                        <span className={`badge ${item.status === "Approved" ? "badge-green" : item.status === "Rejected" ? "badge-red" : "badge-orange"}`}>
-                          {item.status}
-                        </span>
-                      </td>
-                      <td>{item.remarks || "—"}</td>
-                      <td>
-                        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                          <button className="btn-icon" title="Edit" onClick={() => startEdit(item)}><FiEdit2 size={13} /></button>
-                          {deleteConfirmId === item.id ? (
-                            <span style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "12px", color: "var(--danger)" }}>
-                              Sure?
-                              <button className="btn-icon" style={{ color: "var(--danger)" }} onClick={() => handleDelete(item.id)}><FiCheck size={13} /></button>
-                              <button className="btn-icon" onClick={() => setDeleteConfirmId(null)}><FiX size={13} /></button>
-                            </span>
-                          ) : (
-                            <button className="btn-icon" title="Delete" style={{ color: "var(--danger)" }} onClick={() => { setDeleteConfirmId(item.id); setEditId(null); }}><FiTrash2 size={13} /></button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "16px", flexWrap: "wrap", gap: "10px" }}>
-              <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
-                Showing {((currentPage - 1) * pageSize) + 1} - {Math.min(currentPage * pageSize, filtered.length)} of {filtered.length} entries
-              </span>
-              <div style={{ display: "flex", gap: "4px" }}>
-                <button className="btn btn-ghost btn-sm" onClick={() => setCurrentPage(p => Math.max(p - 1, 1))} disabled={currentPage === 1}>
-                  Prev
-                </button>
-                <span style={{ fontSize: "12px", fontWeight: "600", padding: "6px 12px", color: "var(--text-primary)" }}>
-                  Page {currentPage} of {totalPages}
+            {/* Records table */}
+            <div className="card">
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
+                <span style={{ fontWeight: 600, color: "var(--text-primary)", fontSize: "14px" }}>
+                  {activeTab === "factory" ? "Factory Sample Logs" : "Sample Approved Logs"} ({filtered.length})
                 </span>
-                <button className="btn btn-ghost btn-sm" onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages}>
-                  Next
-                </button>
+                <div className="search-bar">
+                  <FiSearch size={14} />
+                  <input placeholder="Search sample, warehouse, trade..." value={search} onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }} />
+                </div>
               </div>
+
+              <div style={{ overflowX: "auto" }}>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>INSPECTION DATE</th>
+                      <th>FIRM</th>
+                      <th>WAREHOUSE</th>
+                      <th>TRADE</th>
+                      <th>SAMPLE NAME</th>
+                      <th>QTY</th>
+                      <th>STATUS</th>
+                      <th>REMARKS</th>
+                      {!isReadOnly() && <th>ACTIONS</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginated.length === 0 ? (
+                      <tr>
+                        <td colSpan={10}>
+                          <div className="empty-state">No sample inspection records found.</div>
+                        </td>
+                      </tr>
+                    ) : (
+                      paginated.map((item, index) => (
+                        <tr id={`sample-row-${item.id}`} key={item.id}>
+                          <td style={{ color: "var(--text-muted)" }}>{((currentPage - 1) * pageSize) + index + 1}</td>
+                          <td style={{ fontWeight: 500 }}>{item.date}</td>
+                          <td>{item.firm}</td>
+                          <td>{item.warehouse_name}</td>
+                          <td><span className="badge badge-purple">{item.trade}</span></td>
+                          <td style={{ fontWeight: 600, color: "var(--text-primary)" }}>{item.sample_name}</td>
+                          <td><span className="badge badge-blue">{item.quantity}</span></td>
+                          <td>
+                            <span className={`badge ${item.status === "Approved" ? "badge-green" : item.status === "Rejected" ? "badge-red" : "badge-orange"}`}>
+                              {item.status}
+                            </span>
+                          </td>
+                          <td>{item.remarks || "—"}</td>
+                          {!isReadOnly() && (
+                            <td>
+                              <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                                <button className="btn-icon" title="Edit" onClick={() => startEdit(item)}><FiEdit2 size={13} /></button>
+                                {deleteConfirmId === item.id ? (
+                                  <span style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "12px", color: "var(--danger)" }}>
+                                    Sure?
+                                    <button className="btn-icon" style={{ color: "var(--danger)" }} onClick={() => handleDelete(item.id)}><FiCheck size={13} /></button>
+                                    <button className="btn-icon" onClick={() => setDeleteConfirmId(null)}><FiX size={13} /></button>
+                                  </span>
+                                ) : (
+                                  <button className="btn-icon" title="Delete" style={{ color: "var(--danger)" }} onClick={() => { setDeleteConfirmId(item.id); setEditId(null); }}><FiTrash2 size={13} /></button>
+                                )}
+                              </div>
+                            </td>
+                          )}
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "16px", flexWrap: "wrap", gap: "10px" }}>
+                  <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                    Showing {((currentPage - 1) * pageSize) + 1} - {Math.min(currentPage * pageSize, filtered.length)} of {filtered.length} entries
+                  </span>
+                  <div style={{ display: "flex", gap: "4px" }}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setCurrentPage(p => Math.max(p - 1, 1))} disabled={currentPage === 1}>
+                      Prev
+                    </button>
+                    <span style={{ fontSize: "12px", fontWeight: "600", padding: "6px 12px", color: "var(--text-primary)" }}>
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages}>
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
           </>
         )}
 
