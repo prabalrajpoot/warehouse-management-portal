@@ -40,7 +40,7 @@ function Login() {
 
   return (
     <div className="login-bg" style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px" }}>
-      <div className="glass-card" style={{
+      <div className="glass-card login-card" style={{
         display: "flex",
         width: "100%",
         maxWidth: "900px",
@@ -50,9 +50,9 @@ function Login() {
         border: "1px solid var(--border)",
         background: "var(--bg-surface)"
       }}>
-        
+
         {/* Left Side: Description / Features info */}
-        <div style={{
+        <div className="login-left-panel" style={{
           flex: 1.1,
           background: "linear-gradient(135deg, var(--accent) 0%, #312e81 100%)",
           color: "#fff",
@@ -77,7 +77,7 @@ function Login() {
               </div>
               <span style={{ fontWeight: 800, fontSize: "18px", letterSpacing: "0.5px" }}>WMS Portal</span>
             </div>
-            
+
             <h2 style={{ fontSize: "28px", fontWeight: 800, marginBottom: "16px", lineHeight: 1.25 }}>
               Smart Warehouse Tracking & Metrics
             </h2>
@@ -122,77 +122,73 @@ function Login() {
         </div>
 
         {/* Right Side: Form */}
-        <div style={{ flex: 0.9, padding: "48px", background: "var(--bg-surface)", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-          {loading ? (
-            <Loader message="Verifying credentials..." />
-          ) : (
-            <>
-              <div style={{ marginBottom: "36px" }}>
-                <h1 style={{ fontSize: "24px", fontWeight: 800, color: "var(--text-primary)" }}>Welcome Back</h1>
-                <p style={{ color: "var(--text-secondary)", fontSize: "13px", marginTop: "6px" }}>
-                  Please enter your login credentials below
-                </p>
-              </div>
+        <div className="login-right-panel" style={{ flex: 0.9, padding: "48px", background: "var(--bg-surface)", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+          <div style={{ marginBottom: "36px" }}>
+            <h1 style={{ fontSize: "24px", fontWeight: 800, color: "var(--text-primary)" }}>Welcome Back</h1>
+            <p style={{ color: "var(--text-secondary)", fontSize: "13px", marginTop: "6px" }}>
+              Please enter your login credentials below
+            </p>
+          </div>
 
-              {error && (
-                <div className="alert alert-error" style={{ marginBottom: "24px" }}>
-                  {error}
-                </div>
-              )}
-
-              <div className="form-group" style={{ marginBottom: "18px" }}>
-                <label className="form-label" style={{ fontWeight: 600 }}>Email Address</label>
-                <div style={{ position: "relative" }}>
-                  <FiMail style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
-                  <input
-                    className="form-input"
-                    type="email"
-                    placeholder="email@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && login()}
-                    style={{ paddingLeft: "36px", height: "40px" }}
-                  />
-                </div>
-              </div>
-
-              <div className="form-group" style={{ marginBottom: "28px" }}>
-                <label className="form-label" style={{ fontWeight: 600 }}>Password</label>
-                <div style={{ position: "relative" }}>
-                  <FiLock style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
-                  <input
-                    className="form-input"
-                    type="password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && login()}
-                    style={{ paddingLeft: "36px", height: "40px" }}
-                  />
-                </div>
-              </div>
-
-              <button
-                className="btn btn-primary"
-                onClick={login}
-                disabled={loading}
-                style={{
-                  width: "100%",
-                  justifyContent: "center",
-                  height: "40px",
-                  fontSize: "14px",
-                  opacity: loading ? 0.75 : 1,
-                  cursor: loading ? "not-allowed" : "pointer"
-                }}
-              >
-                <FiLogIn size={16} /> Sign In
-              </button>
-            </>
+          {error && (
+            <div className="alert alert-error" style={{ marginBottom: "24px" }}>
+              {error}
+            </div>
           )}
-        </div>
 
+          <div className="form-group" style={{ marginBottom: "18px" }}>
+            <label className="form-label" style={{ fontWeight: 600 }}>Email Address</label>
+            <div style={{ position: "relative" }}>
+              <FiMail style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
+              <input
+                className="form-input"
+                type="email"
+                placeholder="email@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && login()}
+                style={{ paddingLeft: "36px", height: "40px" }}
+              />
+            </div>
+          </div>
+
+          <div className="form-group" style={{ marginBottom: "28px" }}>
+            <label className="form-label" style={{ fontWeight: 600 }}>Password</label>
+            <div style={{ position: "relative" }}>
+              <FiLock style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
+              <input
+                className="form-input"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && login()}
+                style={{ paddingLeft: "36px", height: "40px" }}
+              />
+            </div>
+          </div>
+
+          <button
+            className="btn btn-primary"
+            onClick={login}
+            disabled={loading}
+            style={{
+              width: "100%",
+              justifyContent: "center",
+              height: "40px",
+              fontSize: "14px",
+              opacity: loading ? 0.75 : 1,
+              cursor: loading ? "not-allowed" : "pointer"
+            }}
+          >
+            <FiLogIn size={16} /> Sign In
+          </button>
+        </>
+          )}
       </div>
+
     </div>
+    </div >
   );
 }
 
