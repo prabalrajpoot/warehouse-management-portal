@@ -39,7 +39,7 @@ function Login() {
 
   return (
     <div className="login-bg" style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px" }}>
-      <div className="glass-card" style={{
+      <div className="glass-card login-card" style={{
         display: "flex",
         width: "100%",
         maxWidth: "900px",
@@ -49,9 +49,9 @@ function Login() {
         border: "1px solid var(--border)",
         background: "var(--bg-surface)"
       }}>
-        
+
         {/* Left Side: Description / Features info */}
-        <div style={{
+        <div className="login-left-panel" style={{
           flex: 1.1,
           background: "linear-gradient(135deg, var(--accent) 0%, #312e81 100%)",
           color: "#fff",
@@ -76,7 +76,7 @@ function Login() {
               </div>
               <span style={{ fontWeight: 800, fontSize: "18px", letterSpacing: "0.5px" }}>WMS Portal</span>
             </div>
-            
+
             <h2 style={{ fontSize: "28px", fontWeight: 800, marginBottom: "16px", lineHeight: 1.25 }}>
               Smart Warehouse Tracking & Metrics
             </h2>
@@ -121,7 +121,7 @@ function Login() {
         </div>
 
         {/* Right Side: Form */}
-        <div style={{ flex: 0.9, padding: "48px", background: "var(--bg-surface)", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+        <div className="login-right-panel" style={{ flex: 0.9, padding: "48px", background: "var(--bg-surface)", display: "flex", flexDirection: "column", justifyContent: "center" }}>
           <div style={{ marginBottom: "36px" }}>
             <h1 style={{ fontSize: "24px", fontWeight: 800, color: "var(--text-primary)" }}>Welcome Back</h1>
             <p style={{ color: "var(--text-secondary)", fontSize: "13px", marginTop: "6px" }}>
