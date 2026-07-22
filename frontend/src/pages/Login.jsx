@@ -38,30 +38,12 @@ function Login() {
   };
 
   return (
-    <div className="login-bg" style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px" }}>
-      <div className="glass-card login-card" style={{
-        display: "flex",
-        width: "100%",
-        maxWidth: "900px",
-        borderRadius: "24px",
-        overflow: "hidden",
-        boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.15)",
-        border: "1px solid var(--border)",
-        background: "var(--bg-surface)"
-      }}>
-
-        {/* Left Side: Description / Features info */}
-        <div className="login-left-panel" style={{
-          flex: 1.1,
-          background: "linear-gradient(135deg, var(--accent) 0%, #312e81 100%)",
-          color: "#fff",
-          padding: "48px",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "space-between"
-        }}>
+    <div className="login-bg">
+      <div className="glass-card login-card">
+        {/* Left Side: Branding & Info */}
+        <div className="login-left-panel">
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "36px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "24px" }}>
               <div style={{
                 width: "42px",
                 height: "42px",
@@ -77,15 +59,15 @@ function Login() {
               <span style={{ fontWeight: 800, fontSize: "18px", letterSpacing: "0.5px" }}>WMS Portal</span>
             </div>
 
-            <h2 style={{ fontSize: "28px", fontWeight: 800, marginBottom: "16px", lineHeight: 1.25 }}>
+            <h2 style={{ fontSize: "24px", fontWeight: 800, marginBottom: "12px", lineHeight: 1.25 }}>
               Smart Warehouse Tracking & Metrics
             </h2>
-            <p style={{ opacity: 0.85, fontSize: "14px", marginBottom: "32px", lineHeight: 1.6 }}>
+            <p style={{ opacity: 0.85, fontSize: "13px", marginBottom: "24px", lineHeight: 1.6 }}>
               A centralized hub to monitor inventories, log kit updates, manage India Post dispatches, track manpower logs, and review QAA inspections.
             </p>
 
-            {/* Feature lists */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+            {/* Feature list — Hidden on mobile screens via CSS */}
+            <div className="login-features-list" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               {[
                 { title: "Kitting Records", desc: "Log kit creation outputs across different trade sets." },
                 { title: "QAA Inspections", desc: "Submit, inspect, pass/fail, and audit toolkit lots." },
@@ -107,7 +89,7 @@ function Login() {
                     <FiCheck size={12} style={{ color: "#fff" }} />
                   </div>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: "13.5px" }}>{f.title}</div>
+                    <div style={{ fontWeight: 600, fontSize: "13px" }}>{f.title}</div>
                     <div style={{ fontSize: "11px", opacity: 0.75, marginTop: "2px" }}>{f.desc}</div>
                   </div>
                 </div>
@@ -115,14 +97,14 @@ function Login() {
             </div>
           </div>
 
-          <div style={{ fontSize: "11px", opacity: 0.6, marginTop: "32px" }}>
+          <div style={{ fontSize: "11px", opacity: 0.6, marginTop: "24px" }}>
             Warehouse Operations System v2.1 • Design Premium
           </div>
         </div>
 
         {/* Right Side: Form */}
-        <div className="login-right-panel" style={{ flex: 0.9, padding: "48px", background: "var(--bg-surface)", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-          <div style={{ marginBottom: "36px" }}>
+        <div className="login-right-panel">
+          <div style={{ marginBottom: "28px" }}>
             <h1 style={{ fontSize: "24px", fontWeight: 800, color: "var(--text-primary)" }}>Welcome Back</h1>
             <p style={{ color: "var(--text-secondary)", fontSize: "13px", marginTop: "6px" }}>
               Please enter your login credentials below
@@ -130,7 +112,7 @@ function Login() {
           </div>
 
           {error && (
-            <div className="alert alert-error" style={{ marginBottom: "24px" }}>
+            <div className="alert alert-error" style={{ marginBottom: "20px" }}>
               {error}
             </div>
           )}
@@ -138,7 +120,7 @@ function Login() {
           <div className="form-group" style={{ marginBottom: "18px" }}>
             <label className="form-label" style={{ fontWeight: 600 }}>Email Address</label>
             <div style={{ position: "relative" }}>
-              <FiMail style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
+              <FiMail style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }} />
               <input
                 className="form-input"
                 type="email"
@@ -154,7 +136,7 @@ function Login() {
           <div className="form-group" style={{ marginBottom: "28px" }}>
             <label className="form-label" style={{ fontWeight: 600 }}>Password</label>
             <div style={{ position: "relative" }}>
-              <FiLock style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
+              <FiLock style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }} />
               <input
                 className="form-input"
                 type="password"
@@ -183,7 +165,6 @@ function Login() {
             {loading ? "Verifying..." : <><FiLogIn size={16} /> Sign In</>}
           </button>
         </div>
-
       </div>
     </div>
   );
