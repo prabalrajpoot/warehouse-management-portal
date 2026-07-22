@@ -2,7 +2,6 @@ import { useState } from "react";
 import api from "../api/api";
 import { useNavigate } from "react-router-dom";
 import { FiMail, FiLock, FiLogIn, FiCheck } from "react-icons/fi";
-import Loader from "../components/Loader";
 
 function Login() {
   const [email, setEmail] = useState("");
@@ -181,14 +180,12 @@ function Login() {
               cursor: loading ? "not-allowed" : "pointer"
             }}
           >
-            <FiLogIn size={16} /> Sign In
+            {loading ? "Verifying..." : <><FiLogIn size={16} /> Sign In</>}
           </button>
-        </>
-          )}
-      </div>
+        </div>
 
+      </div>
     </div>
-    </div >
   );
 }
 

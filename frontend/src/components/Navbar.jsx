@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import {
   FiGrid,
   FiUpload,
@@ -53,20 +53,6 @@ function Navbar() {
   const location = useLocation();
   const [role, setRole] = useState(null);
   const [warehouseName, setWarehouseName] = useState("");
-  const scrollRef = useRef(null);
-
-  useEffect(() => {
-    if (role !== null) {
-      const savedScroll = sessionStorage.getItem("sidebar-scroll");
-      if (savedScroll && scrollRef.current) {
-        requestAnimationFrame(() => {
-          if (scrollRef.current) {
-            scrollRef.current.scrollTop = parseInt(savedScroll, 10);
-          }
-        });
-      }
-    }
-  }, [role]);
 
   const [theme, setTheme] = useState(localStorage.getItem("theme") || "light");
 
