@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
-import Loader from "../components/Loader";
 import Navbar from "../components/Navbar";
 import api from "../api/api";
-import { FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch, FiDownload, FiEye } from "react-icons/fi";
-import { isReadOnly } from "../utils/auth";
+import { FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch, FiDownload, FiEye, FiUpload } from "react-icons/fi";
+import { isReadOnly, isWarehouseManager, canDelete } from "../utils/auth";
 import jsPDF from "jspdf";
 import * as XLSX from "xlsx";
 
@@ -29,6 +28,29 @@ const toYMD = (dateStr) => {
   return dateStr;
 };
 
+const FIRM_OPTIONS = ["ITI", "PTL", "VTL"];
+
+const FIRM_TRADE_MAP = {
+  "ITI": [
+    "Barber (Naai)",
+    "Potter (Kumhar)",
+    "Washerman (Dhobi)"
+  ],
+  "PTL": [
+    "Armourer",
+    "Metal Smith / Metal Caster",
+    "Sculptor (Moortikar)/Stone Carver/Stone Breaker",
+    "Hammer and ToolKit Maker",
+    "Fishing Net Maker",
+    "Boat Maker",
+    "Barber (Naai)"
+  ],
+  "VTL": [
+    "Potter (Kumhar)",
+    "Washerman (Dhobi)"
+  ]
+};
+
 const TRADE_OPTIONS = [
   "Armourer",
   "Metal Smith / Metal Caster",
@@ -48,13 +70,13 @@ function InwardSection() {
   const [entries, setEntries] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [msg, setMsg] = useState("");
-  const [loading, setLoading] = useState(true);
 
   // Column filters
   const [filterDate, setFilterDate] = useState("");
   const [filterItemName, setFilterItemName] = useState("");
   const [filterInvoiceNo, setFilterInvoiceNo] = useState("");
   const [filterTrade, setFilterTrade] = useState("");
+  const [filterFirm, setFilterFirm] = useState("");
 
   // Pagination & Selection states
   const [currentPage, setCurrentPage] = useState(1);
@@ -64,7 +86,7 @@ function InwardSection() {
   const emptyForm = {
     received_date: "", received_qty: "", invoice_date: "",
     invoice_no: "", invoice_qty: "", short_damage_qty: "",
-    item_name: "", brand_description: "", trade_name: ""
+    item_name: "", brand_description: "", trade_name: "", firm_name: ""
   };
   const [form, setForm] = useState(emptyForm);
 
@@ -75,16 +97,8 @@ function InwardSection() {
   useEffect(() => { fetchEntries(); }, []);
 
   const fetchEntries = async () => {
-    try {
-      setLoading(true);
-      const r = await api.get("/inventory-inward");
-      setEntries(r.data);
-    }
-    catch (e) {
-      console.log(e);
-    } finally {
-      setLoading(false);
-    }
+    try { const r = await api.get("/inventory-inward"); setEntries(r.data); }
+    catch (e) { console.log(e); }
   };
 
   const handleChange = (key, val) => setForm((f) => ({ ...f, [key]: val }));
@@ -102,7 +116,8 @@ function InwardSection() {
         short_damage_qty: form.short_damage_qty ? Number(form.short_damage_qty) : null,
         item_name: form.item_name || null,
         brand_description: form.brand_description || null,
-        trade_name: form.trade_name || null
+        trade_name: form.trade_name || null,
+        firm_name: form.firm_name || null
       });
       setForm(emptyForm); setShowForm(false); setMsg(""); fetchEntries();
     } catch { setMsg("Failed to save inward entry."); }
@@ -115,7 +130,7 @@ function InwardSection() {
       invoice_date: toYMD(item.invoice_date) || "", invoice_no: item.invoice_no || "",
       invoice_qty: item.invoice_qty ?? "", short_damage_qty: item.short_damage_qty ?? "",
       item_name: item.item_name || "", brand_description: item.brand_description || "",
-      trade_name: item.trade_name || ""
+      trade_name: item.trade_name || "", firm_name: item.firm_name || ""
     });
     setShowForm(false); setDeleteConfirmId(null);
     setTimeout(() => {
@@ -138,7 +153,8 @@ function InwardSection() {
         short_damage_qty: editForm.short_damage_qty ? Number(editForm.short_damage_qty) : null,
         item_name: editForm.item_name || null,
         brand_description: editForm.brand_description || null,
-        trade_name: editForm.trade_name || null
+        trade_name: editForm.trade_name || null,
+        firm_name: editForm.firm_name || null
       });
       const updatedId = editId;
       setEditId(null); 
@@ -180,21 +196,92 @@ function InwardSection() {
     }
   };
 
+  const handleInwardFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (isWarehouseManager()) {
+      const proceed = window.confirm(
+        "⚠️ Attention: Please ensure that all entries in your Excel file are valid and correct before uploading. As a Warehouse Manager, you will not have permission to delete entries once they are imported. Do you want to proceed with the upload?"
+      );
+      if (!proceed) {
+        e.target.value = "";
+        return;
+      }
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target.result;
+        const wb = XLSX.read(bstr, { type: "binary" });
+        const wsName = wb.SheetNames[0];
+        const ws = wb.Sheets[wsName];
+        const data = XLSX.utils.sheet_to_json(ws);
+
+        if (!data || data.length === 0) {
+          alert("The uploaded Excel file appears to be empty.");
+          return;
+        }
+
+        let successCount = 0;
+        for (const row of data) {
+          const recDate = row["Received Date"] || row["received_date"] || "";
+          const recQty = row["Received Qty"] || row["received_qty"] || null;
+          const invDate = row["Invoice Date"] || row["invoice_date"] || null;
+          const invNo = row["Invoice No"] || row["Invoice No."] || row["invoice_no"] || null;
+          const invQty = row["Invoice Qty"] || row["invoice_qty"] || null;
+          const damageQty = row["Short/Damage Qty"] || row["short_damage_qty"] || null;
+          const item = row["Item Name"] || row["item_name"] || null;
+          const brand = row["Brand/Description"] || row["brand_description"] || null;
+          const trade = row["Trade Name"] || row["Trade Category"] || row["trade_name"] || null;
+          const firm = row["Firm Name"] || row["Firm"] || row["firm_name"] || null;
+
+          if (recDate) {
+            await api.post("/inventory-inward", {
+              received_date: toDMY(String(recDate)),
+              received_qty: recQty ? Number(recQty) : null,
+              invoice_date: invDate ? toDMY(String(invDate)) : null,
+              invoice_no: invNo ? String(invNo) : null,
+              invoice_qty: invQty ? Number(invQty) : null,
+              short_damage_qty: damageQty ? Number(damageQty) : null,
+              item_name: item ? String(item) : null,
+              brand_description: brand ? String(brand) : null,
+              trade_name: trade ? String(trade) : null,
+              firm_name: firm ? String(firm) : null
+            });
+            successCount++;
+          }
+        }
+        alert(`Successfully imported ${successCount} inward stock record(s).`);
+        fetchEntries();
+      } catch (err) {
+        console.error(err);
+        alert("Failed to process inward Excel file.");
+      } finally {
+        e.target.value = "";
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
   const uniqueTrades = [...new Set(entries.map(e => e.trade_name).filter(Boolean))].sort();
+  const uniqueFirms = [...new Set(entries.map(e => e.firm_name).filter(Boolean))].sort();
 
   const filtered = entries.filter((item) => {
     if (filterDate && !(item.received_date || "").includes(filterDate)) return false;
     if (filterItemName && !(item.item_name || "").toLowerCase().includes(filterItemName.toLowerCase())) return false;
     if (filterInvoiceNo && !(item.invoice_no || "").toLowerCase().includes(filterInvoiceNo.toLowerCase())) return false;
     if (filterTrade && (item.trade_name || "") !== filterTrade) return false;
+    if (filterFirm && (item.firm_name || "") !== filterFirm) return false;
     return true;
   });
 
   const clearFilters = () => {
-    setFilterDate(""); setFilterItemName(""); setFilterInvoiceNo(""); setFilterTrade(""); setCurrentPage(1);
+    setFilterDate(""); setFilterItemName(""); setFilterInvoiceNo(""); setFilterTrade(""); setFilterFirm(""); setCurrentPage(1);
   };
 
-  const hasActiveFilters = filterDate || filterItemName || filterInvoiceNo || filterTrade;
+  const hasActiveFilters = filterDate || filterItemName || filterInvoiceNo || filterTrade || filterFirm;
 
   // Master Checkbox Logic
   const isAllSelected = filtered.length > 0 && selectedIds.length === filtered.length;
@@ -224,7 +311,7 @@ function InwardSection() {
     doc.setFontSize(14);
     doc.text("Inward Stock Report", 20, 20);
     doc.setFontSize(9);
-    const headers = ["#", "Received Date", "Received Qty", "Invoice Date", "Invoice No.", "Invoice Qty", "Short/Damage", "Item Name", "Brand/Desc"];
+    const headers = ["#", "Received Date", "Received Qty", "Invoice Date", "Invoice No.", "Invoice Qty", "Short/Damage", "Item Name", "Brand/Desc", "Firm", "Trade"];
     doc.text(headers.join(" | "), 20, 32);
     doc.line(20, 35, 190, 35);
     let yPos = 42;
@@ -239,7 +326,9 @@ function InwardSection() {
         String(item.invoice_qty ?? "—"),
         String(item.short_damage_qty ?? "—"),
         item.item_name || "—",
-        item.brand_description || "—"
+        item.brand_description || "—",
+        item.firm_name || "—",
+        item.trade_name || "—"
       ];
       doc.text(row.join(" | "), 20, yPos);
       yPos += 8;
@@ -257,7 +346,9 @@ function InwardSection() {
       "Invoice Qty": item.invoice_qty,
       "Short/Damage Qty": item.short_damage_qty,
       "Item Name": item.item_name,
-      "Brand/Description": item.brand_description
+      "Brand/Description": item.brand_description,
+      "Firm Name": item.firm_name,
+      "Trade Name": item.trade_name
     }));
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
@@ -274,16 +365,13 @@ function InwardSection() {
     { key: "short_damage_qty", label: "Short/Damage Qty", type: "number" },
     { key: "item_name", label: "Item Name", type: "text", placeholder: "e.g. Safety Helmet" },
     { key: "brand_description", label: "Brand / Description", type: "text", placeholder: "e.g. 3M — Industrial Grade" },
+    { key: "firm_name", label: "Firm Name", type: "firm_select" },
     { key: "trade_name", label: "Trade Category", type: "select" }
   ];
 
   return (
     <>
-      {loading ? (
-        <Loader message="Loading inward stock logs..." />
-      ) : (
-        <>
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginBottom: "16px", alignItems: "center" }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginBottom: "16px", alignItems: "center", flexWrap: "wrap" }}>
         <button className="btn btn-ghost btn-sm" onClick={exportPDF}>
           <FiDownload size={13} /> PDF
         </button>
@@ -291,9 +379,25 @@ function InwardSection() {
           <FiDownload size={13} /> Excel
         </button>
         {!isReadOnly() && (
-          <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setEditId(null); setMsg(""); }}>
-            <FiPlus size={14} /> {showForm ? "Cancel" : "Add Inward Entry"}
-          </button>
+          <>
+            <input
+              type="file"
+              id="inward-excel-input"
+              style={{ display: "none" }}
+              accept=".xlsx, .xls, .csv"
+              onChange={handleInwardFileUpload}
+            />
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => document.getElementById("inward-excel-input").click()}
+              style={{ display: "flex", gap: "6px", alignItems: "center" }}
+            >
+              <FiUpload size={14} /> Upload Excel
+            </button>
+            <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setEditId(null); setMsg(""); }}>
+              <FiPlus size={14} /> {showForm ? "Cancel" : "Add Inward Entry"}
+            </button>
+          </>
         )}
       </div>
 
@@ -313,6 +417,17 @@ function InwardSection() {
                     <option value="">— Select Trade —</option>
                     {TRADE_OPTIONS.map(t => (
                       <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                ) : type === "firm_select" ? (
+                  <select
+                    className="form-select"
+                    value={form[key]}
+                    onChange={(e) => handleChange(key, e.target.value)}
+                  >
+                    <option value="">— Select Firm —</option>
+                    {FIRM_OPTIONS.map(f => (
+                      <option key={f} value={f}>{f}</option>
                     ))}
                   </select>
                 ) : (
@@ -347,6 +462,17 @@ function InwardSection() {
                       <option key={t} value={t}>{t}</option>
                     ))}
                   </select>
+                ) : type === "firm_select" ? (
+                  <select
+                    className="form-select"
+                    value={editForm[key]}
+                    onChange={(e) => handleEditChange(key, e.target.value)}
+                  >
+                    <option value="">— Select Firm —</option>
+                    {FIRM_OPTIONS.map(f => (
+                      <option key={f} value={f}>{f}</option>
+                    ))}
+                  </select>
                 ) : (
                   <input
                     className="form-input" type={type} placeholder={placeholder || ""}
@@ -376,7 +502,7 @@ function InwardSection() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", flexWrap: "wrap", gap: "12px" }}>
           <span style={{ fontWeight: 600, color: "var(--text-primary)", fontSize: "14px" }}>Inward Records ({filtered.length})</span>
           <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-            {!isReadOnly() && selectedIds.length > 0 && (
+            {!isReadOnly() && canDelete() && selectedIds.length > 0 && (
               <button className="btn btn-danger btn-sm" onClick={deleteSelected}>
                 <FiTrash2 size={13} /> Delete Selected ({selectedIds.length})
               </button>
@@ -404,6 +530,14 @@ function InwardSection() {
             <input className="form-input" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} type="text" placeholder="Search..." value={filterInvoiceNo} onChange={e => { setFilterInvoiceNo(e.target.value); setCurrentPage(1); }} />
           </div>
           <div>
+            <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Firm Name</div>
+            <select className="form-select" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} value={filterFirm} onChange={e => { setFilterFirm(e.target.value); setCurrentPage(1); }}>
+              <option value="">All</option>
+              {FIRM_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
+              {uniqueFirms.filter(f => !FIRM_OPTIONS.includes(f)).map(f => <option key={f} value={f}>{f}</option>)}
+            </select>
+          </div>
+          <div>
             <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Trade Category</div>
             <select className="form-select" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} value={filterTrade} onChange={e => { setFilterTrade(e.target.value); setCurrentPage(1); }}>
               <option value="">All</option>
@@ -411,6 +545,7 @@ function InwardSection() {
             </select>
           </div>
         </div>
+
         <div style={{ overflowX: "auto" }}>
           <table className="data-table">
             <thead>
@@ -426,13 +561,13 @@ function InwardSection() {
                   </th>
                 )}
                 <th>#</th><th>Received Date</th><th>Received Qty</th><th>Invoice Date</th>
-                <th>Invoice No.</th><th>Invoice Qty</th><th>Short/Damage</th><th>Item Name</th><th>Brand/Desc</th><th>Trade</th>
+                <th>Invoice No.</th><th>Invoice Qty</th><th>Short/Damage</th><th>Item Name</th><th>Brand/Desc</th><th>Firm</th><th>Trade</th>
                 {!isReadOnly() && <th>Actions</th>}
               </tr>
             </thead>
             <tbody>
               {paginated.length === 0 ? (
-                <tr><td colSpan={12}><div className="empty-state">No inward entries found.</div></td></tr>
+                <tr><td colSpan={13}><div className="empty-state">No inward entries found.</div></td></tr>
               ) : (
                 paginated.map((item, i) => (
                   <tr id={`inward-row-${item.id}`} key={item.id} style={{ background: selectedIds.includes(item.id) ? "var(--bg-elevated)" : "transparent" }}>
@@ -462,8 +597,15 @@ function InwardSection() {
                       {item.brand_description || "—"}
                     </td>
                     <td>
+                      {item.firm_name ? (
+                        <span className="badge badge-purple">{item.firm_name}</span>
+                      ) : (
+                        <span style={{ color: "var(--text-muted)", fontStyle: "italic" }}>—</span>
+                      )}
+                    </td>
+                    <td>
                       {item.trade_name ? (
-                        <span className="badge badge-purple">{item.trade_name}</span>
+                        <span className="badge badge-blue">{item.trade_name}</span>
                       ) : (
                         <span style={{ color: "var(--text-muted)", fontStyle: "italic" }}>—</span>
                       )}
@@ -472,17 +614,19 @@ function InwardSection() {
                       <td>
                         <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                           <button className="btn-icon" title="Edit" onClick={() => startEdit(item)}><FiEdit2 size={13} /></button>
-                          {deleteConfirmId === item.id ? (
-                            <span style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "12px", color: "var(--danger)" }}>
-                              Sure?
-                              <button className="btn-icon" style={{ color: "var(--danger)" }} onClick={() => deleteEntry(item.id)}><FiCheck size={13} /></button>
-                              <button className="btn-icon" onClick={() => setDeleteConfirmId(null)}><FiX size={13} /></button>
-                            </span>
-                          ) : (
-                            <button className="btn-icon" title="Delete" style={{ color: "var(--danger)" }}
-                              onClick={() => { setDeleteConfirmId(item.id); setEditId(null); }}>
-                              <FiTrash2 size={13} />
-                            </button>
+                          {canDelete() && (
+                            deleteConfirmId === item.id ? (
+                              <span style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "12px", color: "var(--danger)" }}>
+                                Sure?
+                                <button className="btn-icon" style={{ color: "var(--danger)" }} onClick={() => deleteEntry(item.id)}><FiCheck size={13} /></button>
+                                <button className="btn-icon" onClick={() => setDeleteConfirmId(null)}><FiX size={13} /></button>
+                              </span>
+                            ) : (
+                              <button className="btn-icon" title="Delete" style={{ color: "var(--danger)" }}
+                                onClick={() => { setDeleteConfirmId(item.id); setEditId(null); }}>
+                                <FiTrash2 size={13} />
+                              </button>
+                            )
                           )}
                         </div>
                       </td>
@@ -514,8 +658,6 @@ function InwardSection() {
           </div>
         )}
       </div>
-        </>
-      )}
     </>
   );
 }
@@ -527,13 +669,13 @@ function OutwardSection() {
   const [entries, setEntries] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [msg, setMsg] = useState("");
-  const [loading, setLoading] = useState(true);
 
   // Column filters
   const [filterDate, setFilterDate] = useState("");
   const [filterInvoiceNo, setFilterInvoiceNo] = useState("");
   const [filterItemName, setFilterItemName] = useState("");
   const [filterTrade, setFilterTrade] = useState("");
+  const [filterFirm, setFilterFirm] = useState("");
   const [filterFrom, setFilterFrom] = useState("");
   const [filterTo, setFilterTo] = useState("");
 
@@ -544,7 +686,7 @@ function OutwardSection() {
 
   const emptyForm = {
     transfer_date: "", invoice_no: "", item_name: "",
-    brand: "", trade_name: "", qty: "",
+    brand: "", trade_name: "", firm_name: "", qty: "",
     warehouse_from: "", warehouse_to: ""
   };
   const [form, setForm] = useState(emptyForm);
@@ -556,16 +698,8 @@ function OutwardSection() {
   useEffect(() => { fetchEntries(); }, []);
 
   const fetchEntries = async () => {
-    try {
-      setLoading(true);
-      const r = await api.get("/inventory-outward");
-      setEntries(r.data);
-    }
-    catch (e) {
-      console.log(e);
-    } finally {
-      setLoading(false);
-    }
+    try { const r = await api.get("/inventory-outward"); setEntries(r.data); }
+    catch (e) { console.log(e); }
   };
 
   const handleChange = (key, val) => setForm((f) => ({ ...f, [key]: val }));
@@ -580,6 +714,7 @@ function OutwardSection() {
         item_name: form.item_name || null,
         brand: form.brand || null,
         trade_name: form.trade_name || null,
+        firm_name: form.firm_name || null,
         qty: form.qty ? Number(form.qty) : null,
         warehouse_from: form.warehouse_from || null,
         warehouse_to: form.warehouse_to || null
@@ -593,7 +728,7 @@ function OutwardSection() {
     setEditForm({
       transfer_date: toYMD(item.transfer_date) || "", invoice_no: item.invoice_no || "",
       item_name: item.item_name || "", brand: item.brand || "",
-      trade_name: item.trade_name || "", qty: item.qty ?? "",
+      trade_name: item.trade_name || "", firm_name: item.firm_name || "", qty: item.qty ?? "",
       warehouse_from: item.warehouse_from || "", warehouse_to: item.warehouse_to || ""
     });
     setShowForm(false); setDeleteConfirmId(null);
@@ -614,6 +749,7 @@ function OutwardSection() {
         item_name: editForm.item_name || null,
         brand: editForm.brand || null,
         trade_name: editForm.trade_name || null,
+        firm_name: editForm.firm_name || null,
         qty: editForm.qty ? Number(editForm.qty) : null,
         warehouse_from: editForm.warehouse_from || null,
         warehouse_to: editForm.warehouse_to || null
@@ -658,7 +794,75 @@ function OutwardSection() {
     }
   };
 
+  const handleOutwardFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (isWarehouseManager()) {
+      const proceed = window.confirm(
+        "⚠️ Attention: Please ensure that all entries in your Excel file are valid and correct before uploading. As a Warehouse Manager, you will not have permission to delete entries once they are imported. Do you want to proceed with the upload?"
+      );
+      if (!proceed) {
+        e.target.value = "";
+        return;
+      }
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target.result;
+        const wb = XLSX.read(bstr, { type: "binary" });
+        const wsName = wb.SheetNames[0];
+        const ws = wb.Sheets[wsName];
+        const data = XLSX.utils.sheet_to_json(ws);
+
+        if (!data || data.length === 0) {
+          alert("The uploaded Excel file appears to be empty.");
+          return;
+        }
+
+        let successCount = 0;
+        for (const row of data) {
+          const transDate = row["Transfer Date"] || row["transfer_date"] || "";
+          const invNo = row["Invoice No"] || row["Invoice No."] || row["invoice_no"] || null;
+          const item = row["Item Name"] || row["item_name"] || null;
+          const brand = row["Brand"] || row["brand"] || null;
+          const trade = row["Trade Name"] || row["Trade Category"] || row["trade_name"] || null;
+          const qty = row["Qty"] || row["qty"] || null;
+          const whFrom = row["Warehouse From"] || row["warehouse_from"] || null;
+          const whTo = row["Warehouse To"] || row["warehouse_to"] || null;
+          const firm = row["Firm Name"] || row["Firm"] || row["firm_name"] || null;
+
+          if (transDate) {
+            await api.post("/inventory-outward", {
+              transfer_date: toDMY(String(transDate)),
+              invoice_no: invNo ? String(invNo) : null,
+              item_name: item ? String(item) : null,
+              brand: brand ? String(brand) : null,
+              trade_name: trade ? String(trade) : null,
+              qty: qty ? Number(qty) : null,
+              warehouse_from: whFrom ? String(whFrom) : null,
+              warehouse_to: whTo ? String(whTo) : null,
+              firm_name: firm ? String(firm) : null
+            });
+            successCount++;
+          }
+        }
+        alert(`Successfully imported ${successCount} outward stock record(s).`);
+        fetchEntries();
+      } catch (err) {
+        console.error(err);
+        alert("Failed to process outward Excel file.");
+      } finally {
+        e.target.value = "";
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
   const uniqueTrades = [...new Set(entries.map(e => e.trade_name).filter(Boolean))].sort();
+  const uniqueFirms = [...new Set(entries.map(e => e.firm_name).filter(Boolean))].sort();
   const uniqueFroms = [...new Set(entries.map(e => e.warehouse_from).filter(Boolean))].sort();
   const uniqueTos = [...new Set(entries.map(e => e.warehouse_to).filter(Boolean))].sort();
 
@@ -667,16 +871,17 @@ function OutwardSection() {
     if (filterInvoiceNo && !(item.invoice_no || "").toLowerCase().includes(filterInvoiceNo.toLowerCase())) return false;
     if (filterItemName && !(item.item_name || "").toLowerCase().includes(filterItemName.toLowerCase())) return false;
     if (filterTrade && (item.trade_name || "") !== filterTrade) return false;
+    if (filterFirm && (item.firm_name || "") !== filterFirm) return false;
     if (filterFrom && (item.warehouse_from || "") !== filterFrom) return false;
     if (filterTo && (item.warehouse_to || "") !== filterTo) return false;
     return true;
   });
 
   const clearFilters = () => {
-    setFilterDate(""); setFilterInvoiceNo(""); setFilterItemName(""); setFilterTrade(""); setFilterFrom(""); setFilterTo(""); setCurrentPage(1);
+    setFilterDate(""); setFilterInvoiceNo(""); setFilterItemName(""); setFilterTrade(""); setFilterFirm(""); setFilterFrom(""); setFilterTo(""); setCurrentPage(1);
   };
 
-  const hasActiveFilters = filterDate || filterInvoiceNo || filterItemName || filterTrade || filterFrom || filterTo;
+  const hasActiveFilters = filterDate || filterInvoiceNo || filterItemName || filterTrade || filterFirm || filterFrom || filterTo;
 
   // Master Checkbox Logic
   const isAllSelected = filtered.length > 0 && selectedIds.length === filtered.length;
@@ -704,9 +909,9 @@ function OutwardSection() {
   const exportPDF = () => {
     const doc = new jsPDF();
     doc.setFontSize(14);
-    doc.text("Outward Stock Report", 20, 20);
+    doc.text("Outward / Stock Transfer Report", 20, 20);
     doc.setFontSize(9);
-    const headers = ["#", "Transfer Date", "Invoice No.", "Item Name", "Brand", "Trade Name", "Qty", "Location From", "Location To"];
+    const headers = ["#", "Transfer Date", "Invoice No.", "Item Name", "Brand", "Firm", "Trade", "Qty", "From", "To"];
     doc.text(headers.join(" | "), 20, 32);
     doc.line(20, 35, 190, 35);
     let yPos = 42;
@@ -718,6 +923,7 @@ function OutwardSection() {
         item.invoice_no || "—",
         item.item_name || "—",
         item.brand || "—",
+        item.firm_name || "—",
         item.trade_name || "—",
         String(item.qty ?? "—"),
         item.warehouse_from || "—",
@@ -736,10 +942,11 @@ function OutwardSection() {
       "Invoice No.": item.invoice_no,
       "Item Name": item.item_name,
       "Brand": item.brand,
+      "Firm Name": item.firm_name,
       "Trade Name": item.trade_name,
-      "Qty": item.qty,
-      "Warehouse Location From": item.warehouse_from,
-      "Warehouse Location To": item.warehouse_to
+      "Quantity": item.qty,
+      "Warehouse From": item.warehouse_from,
+      "Warehouse To": item.warehouse_to
     }));
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
@@ -750,21 +957,18 @@ function OutwardSection() {
   const formFields = [
     { key: "transfer_date", label: "Transfer Date", type: "date" },
     { key: "invoice_no", label: "Invoice No.", type: "text", placeholder: "e.g. INV-2024-001" },
-    { key: "item_name", label: "Item Name", type: "text", placeholder: "e.g. Copper Wire" },
-    { key: "brand", label: "Brand", type: "text", placeholder: "e.g. Finolex" },
-    { key: "trade_name", label: "Trade Name", type: "text", placeholder: "e.g. Electrical" },
-    { key: "qty", label: "Qty", type: "number" },
-    { key: "warehouse_from", label: "Warehouse Location From", type: "text", placeholder: "e.g. Main Hub" },
-    { key: "warehouse_to", label: "Warehouse Location To", type: "text", placeholder: "e.g. Site A" },
+    { key: "item_name", label: "Item Name", type: "text", placeholder: "e.g. Safety Helmet" },
+    { key: "brand", label: "Brand", type: "text", placeholder: "e.g. 3M" },
+    { key: "firm_name", label: "Firm Name", type: "firm_select" },
+    { key: "trade_name", label: "Trade Category", type: "select" },
+    { key: "qty", label: "Quantity", type: "number" },
+    { key: "warehouse_from", label: "Warehouse From", type: "text", placeholder: "e.g. Raipur FMT" },
+    { key: "warehouse_to", label: "Warehouse To", type: "text", placeholder: "e.g. Bilaspur FMT" }
   ];
 
   return (
     <>
-      {loading ? (
-        <Loader message="Loading outward stock logs..." />
-      ) : (
-        <>
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginBottom: "16px", alignItems: "center" }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginBottom: "16px", alignItems: "center", flexWrap: "wrap" }}>
         <button className="btn btn-ghost btn-sm" onClick={exportPDF}>
           <FiDownload size={13} /> PDF
         </button>
@@ -772,23 +976,63 @@ function OutwardSection() {
           <FiDownload size={13} /> Excel
         </button>
         {!isReadOnly() && (
-          <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setEditId(null); setMsg(""); }}>
-            <FiPlus size={14} /> {showForm ? "Cancel" : "Add Outward Entry"}
-          </button>
+          <>
+            <input
+              type="file"
+              id="outward-excel-input"
+              style={{ display: "none" }}
+              accept=".xlsx, .xls, .csv"
+              onChange={handleOutwardFileUpload}
+            />
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => document.getElementById("outward-excel-input").click()}
+              style={{ display: "flex", gap: "6px", alignItems: "center" }}
+            >
+              <FiUpload size={14} /> Upload Excel
+            </button>
+            <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setEditId(null); setMsg(""); }}>
+              <FiPlus size={14} /> {showForm ? "Cancel" : "Add Outward Entry"}
+            </button>
+          </>
         )}
       </div>
 
       {showForm && !isReadOnly() && (
         <div className="card">
-          <div className="card-title">New Outward Stock Entry</div>
+          <div className="card-title">New Outward / Stock Transfer Entry</div>
           <div className="form-grid">
             {formFields.map(({ key, label, type, placeholder }) => (
               <div className="form-group" key={key}>
                 <label className="form-label">{label}</label>
-                <input
-                  className="form-input" type={type} placeholder={placeholder || ""}
-                  value={form[key]} onChange={(e) => handleChange(key, e.target.value)}
-                />
+                {type === "select" ? (
+                  <select
+                    className="form-select"
+                    value={form[key]}
+                    onChange={(e) => handleChange(key, e.target.value)}
+                  >
+                    <option value="">— Select Trade —</option>
+                    {TRADE_OPTIONS.map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                ) : type === "firm_select" ? (
+                  <select
+                    className="form-select"
+                    value={form[key]}
+                    onChange={(e) => handleChange(key, e.target.value)}
+                  >
+                    <option value="">— Select Firm —</option>
+                    {FIRM_OPTIONS.map(f => (
+                      <option key={f} value={f}>{f}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    className="form-input" type={type} placeholder={placeholder || ""}
+                    value={form[key]} onChange={(e) => handleChange(key, e.target.value)}
+                  />
+                )}
               </div>
             ))}
           </div>
@@ -804,10 +1048,34 @@ function OutwardSection() {
             {formFields.map(({ key, label, type, placeholder }) => (
               <div className="form-group" key={key}>
                 <label className="form-label">{label}</label>
-                <input
-                  className="form-input" type={type} placeholder={placeholder || ""}
-                  value={editForm[key]} onChange={(e) => handleEditChange(key, e.target.value)}
-                />
+                {type === "select" ? (
+                  <select
+                    className="form-select"
+                    value={editForm[key]}
+                    onChange={(e) => handleEditChange(key, e.target.value)}
+                  >
+                    <option value="">— Select Trade —</option>
+                    {TRADE_OPTIONS.map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                ) : type === "firm_select" ? (
+                  <select
+                    className="form-select"
+                    value={editForm[key]}
+                    onChange={(e) => handleEditChange(key, e.target.value)}
+                  >
+                    <option value="">— Select Firm —</option>
+                    {FIRM_OPTIONS.map(f => (
+                      <option key={f} value={f}>{f}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    className="form-input" type={type} placeholder={placeholder || ""}
+                    value={editForm[key]} onChange={(e) => handleEditChange(key, e.target.value)}
+                  />
+                )}
               </div>
             ))}
           </div>
@@ -831,7 +1099,7 @@ function OutwardSection() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", flexWrap: "wrap", gap: "12px" }}>
           <span style={{ fontWeight: 600, color: "var(--text-primary)", fontSize: "14px" }}>Outward Records ({filtered.length})</span>
           <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-            {!isReadOnly() && selectedIds.length > 0 && (
+            {!isReadOnly() && canDelete() && selectedIds.length > 0 && (
               <button className="btn btn-danger btn-sm" onClick={deleteSelected}>
                 <FiTrash2 size={13} /> Delete Selected ({selectedIds.length})
               </button>
@@ -845,7 +1113,7 @@ function OutwardSection() {
         </div>
 
         {/* Filter Row */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "8px", marginBottom: "14px", padding: "12px", background: "var(--bg-elevated)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "8px", marginBottom: "14px", padding: "12px", background: "var(--bg-elevated)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
           <div>
             <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Transfer Date</div>
             <input className="form-input" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} type="text" placeholder="e.g. 01/01/2025" value={filterDate} onChange={e => { setFilterDate(e.target.value); setCurrentPage(1); }} />
@@ -859,27 +1127,36 @@ function OutwardSection() {
             <input className="form-input" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} type="text" placeholder="Search..." value={filterItemName} onChange={e => { setFilterItemName(e.target.value); setCurrentPage(1); }} />
           </div>
           <div>
-            <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Trade Name</div>
+            <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Firm Name</div>
+            <select className="form-select" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} value={filterFirm} onChange={e => { setFilterFirm(e.target.value); setCurrentPage(1); }}>
+              <option value="">All</option>
+              {FIRM_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
+              {uniqueFirms.filter(f => !FIRM_OPTIONS.includes(f)).map(f => <option key={f} value={f}>{f}</option>)}
+            </select>
+          </div>
+          <div>
+            <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Trade Category</div>
             <select className="form-select" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} value={filterTrade} onChange={e => { setFilterTrade(e.target.value); setCurrentPage(1); }}>
               <option value="">All</option>
               {uniqueTrades.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
           <div>
-            <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Location From</div>
+            <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>From</div>
             <select className="form-select" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} value={filterFrom} onChange={e => { setFilterFrom(e.target.value); setCurrentPage(1); }}>
               <option value="">All</option>
               {uniqueFroms.map(f => <option key={f} value={f}>{f}</option>)}
             </select>
           </div>
           <div>
-            <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Location To</div>
+            <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>To</div>
             <select className="form-select" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} value={filterTo} onChange={e => { setFilterTo(e.target.value); setCurrentPage(1); }}>
               <option value="">All</option>
-              {uniqueTos.map(t => <option key={t} value={t}>{t}</option>)}
+              {uniqueTos.map(f => <option key={f} value={f}>{f}</option>)}
             </select>
           </div>
         </div>
+
         <div style={{ overflowX: "auto" }}>
           <table className="data-table">
             <thead>
@@ -894,8 +1171,8 @@ function OutwardSection() {
                     />
                   </th>
                 )}
-                <th>#</th><th>Transfer Date</th><th>Invoice No.</th><th>Item Name</th>
-                <th>Brand</th><th>Trade Name</th><th>Qty</th><th>Location From</th><th>Location To</th>
+                <th>#</th><th>Transfer Date</th><th>Invoice No.</th><th>Item Name</th><th>Brand</th>
+                <th>Firm</th><th>Trade</th><th>Qty</th><th>Warehouse From</th><th>Warehouse To</th>
                 {!isReadOnly() && <th>Actions</th>}
               </tr>
             </thead>
@@ -920,25 +1197,40 @@ function OutwardSection() {
                     <td><code>{item.invoice_no || "—"}</code></td>
                     <td>{item.item_name || <span style={{ color: "var(--text-muted)", fontStyle: "italic" }}>—</span>}</td>
                     <td>{item.brand || "—"}</td>
-                    <td>{item.trade_name ? <span className="badge badge-purple">{item.trade_name}</span> : "—"}</td>
-                    <td><span className="badge badge-blue" style={{ fontWeight: 700 }}>{item.qty ?? "—"}</span></td>
+                    <td>
+                      {item.firm_name ? (
+                        <span className="badge badge-purple">{item.firm_name}</span>
+                      ) : (
+                        <span style={{ color: "var(--text-muted)", fontStyle: "italic" }}>—</span>
+                      )}
+                    </td>
+                    <td>
+                      {item.trade_name ? (
+                        <span className="badge badge-blue">{item.trade_name}</span>
+                      ) : (
+                        <span style={{ color: "var(--text-muted)", fontStyle: "italic" }}>—</span>
+                      )}
+                    </td>
+                    <td><span className="badge badge-orange" style={{ fontWeight: 700 }}>{item.qty ?? "—"}</span></td>
                     <td>{item.warehouse_from || "—"}</td>
                     <td>{item.warehouse_to || "—"}</td>
                     {!isReadOnly() && (
                       <td>
                         <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                           <button className="btn-icon" title="Edit" onClick={() => startEdit(item)}><FiEdit2 size={13} /></button>
-                          {deleteConfirmId === item.id ? (
-                            <span style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "12px", color: "var(--danger)" }}>
-                              Sure?
-                              <button className="btn-icon" style={{ color: "var(--danger)" }} onClick={() => deleteEntry(item.id)}><FiCheck size={13} /></button>
-                              <button className="btn-icon" onClick={() => setDeleteConfirmId(null)}><FiX size={13} /></button>
-                            </span>
-                          ) : (
-                            <button className="btn-icon" title="Delete" style={{ color: "var(--danger)" }}
-                              onClick={() => { setDeleteConfirmId(item.id); setEditId(null); }}>
-                              <FiTrash2 size={13} />
-                            </button>
+                          {canDelete() && (
+                            deleteConfirmId === item.id ? (
+                              <span style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "12px", color: "var(--danger)" }}>
+                                Sure?
+                                <button className="btn-icon" style={{ color: "var(--danger)" }} onClick={() => deleteEntry(item.id)}><FiCheck size={13} /></button>
+                                <button className="btn-icon" onClick={() => setDeleteConfirmId(null)}><FiX size={13} /></button>
+                              </span>
+                            ) : (
+                              <button className="btn-icon" title="Delete" style={{ color: "var(--danger)" }}
+                                onClick={() => { setDeleteConfirmId(item.id); setEditId(null); }}>
+                                <FiTrash2 size={13} />
+                              </button>
+                            )
                           )}
                         </div>
                       </td>
@@ -970,14 +1262,12 @@ function OutwardSection() {
           </div>
         )}
       </div>
-        </>
-      )}
     </>
   );
 }
 
 /* ─────────────────────────────────────────────
-   Available Stock Sub-Component
+   Available Stock Sub-Component (Firm-wise & Trade-wise)
 ───────────────────────────────────────────── */
 function AvailableStockSection() {
   const [kits, setKits] = useState([]);
@@ -986,6 +1276,8 @@ function AvailableStockSection() {
   const [outward, setOutward] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [filterFirm, setFilterFirm] = useState("");
+  const [filterTrade, setFilterTrade] = useState("");
 
   useEffect(() => {
     const loadAll = async () => {
@@ -1017,17 +1309,22 @@ function AvailableStockSection() {
     ...inward.map(i => i.trade_name),
     ...outward.map(o => o.trade_name),
     ...TRADE_OPTIONS
-  ])).filter(Boolean);
+  ])).filter(Boolean).sort();
+
+  const filteredInward = filterFirm ? inward.filter(i => (i.firm_name === filterFirm || (!i.firm_name && filterFirm === "PTL"))) : inward;
+  const filteredOutward = filterFirm ? outward.filter(o => (o.firm_name === filterFirm || (!o.firm_name && filterFirm === "PTL"))) : outward;
+  const filteredKits = filterFirm ? kits.filter(k => k.firm === filterFirm) : kits;
+  const filteredDispatches = filterFirm ? dispatches.filter(d => d.firm === filterFirm) : dispatches;
 
   const stockData = allTrades.map(trade => {
-    // 1. Kits logic
-    const inwardKits = kits.filter(k => k.trade === trade).reduce((sum, k) => sum + (k.quantity || 0), 0);
-    const outwardKits = dispatches.filter(d => d.trade === trade).reduce((sum, d) => sum + (d.quantity || 0), 0);
+    // 1. Kits logic under this trade
+    const inwardKits = filteredKits.filter(k => k.trade === trade).reduce((sum, k) => sum + (k.quantity || 0), 0);
+    const outwardKits = filteredDispatches.filter(d => d.trade === trade).reduce((sum, d) => sum + (d.quantity || 0), 0);
     const availableKits = inwardKits - outwardKits;
 
     // 2. Items logic under this trade
-    const inwardItems = inward.filter(i => i.trade_name === trade);
-    const outwardItems = outward.filter(o => o.trade_name === trade);
+    const inwardItems = filteredInward.filter(i => i.trade_name === trade);
+    const outwardItems = filteredOutward.filter(o => o.trade_name === trade);
 
     const allItemNames = Array.from(new Set([
       ...inwardItems.map(i => i.item_name),
@@ -1053,33 +1350,73 @@ function AvailableStockSection() {
       items
     };
   }).filter(t => {
+    if (filterTrade && t.trade !== filterTrade) return false;
+
+    // When firm is selected, only show trades belonging to that firm or having data for that firm
+    if (filterFirm) {
+      const allowedTrades = FIRM_TRADE_MAP[filterFirm] || [];
+      const hasFirmData = t.inwardKits > 0 || t.outwardKits > 0 || t.items.length > 0;
+      if (!allowedTrades.includes(t.trade) && !hasFirmData) {
+        return false;
+      }
+    }
+
     if (!search.trim()) return true;
     const s = search.toLowerCase();
     return t.trade.toLowerCase().includes(s) || t.items.some(i => i.name.toLowerCase().includes(s));
   });
 
+  const availableTradesForFilter = filterFirm && FIRM_TRADE_MAP[filterFirm]
+    ? FIRM_TRADE_MAP[filterFirm]
+    : TRADE_OPTIONS;
+
   if (loading) {
-    return <Loader message="Loading stock balance data..." />;
+    return <div className="empty-state">Loading stock balance data...</div>;
   }
 
   return (
     <div className="card">
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
         <span style={{ fontWeight: 600, color: "var(--text-primary)", fontSize: "14px" }}>
           Trade-wise Available Stock Balance
         </span>
-        <div className="search-bar">
-          <FiSearch size={14} />
-          <input
-            placeholder="Search Trade or Item Name..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+        <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+          <select
+            className="form-select"
+            style={{ height: "34px", fontSize: "12px", padding: "4px 8px" }}
+            value={filterFirm}
+            onChange={(e) => {
+              setFilterFirm(e.target.value);
+              setFilterTrade("");
+            }}
+          >
+            <option value="">All Firms</option>
+            {FIRM_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
+          </select>
+
+          <select
+            className="form-select"
+            style={{ height: "34px", fontSize: "12px", padding: "4px 8px" }}
+            value={filterTrade}
+            onChange={(e) => setFilterTrade(e.target.value)}
+          >
+            <option value="">All Trades</option>
+            {availableTradesForFilter.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+
+          <div className="search-bar">
+            <FiSearch size={14} />
+            <input
+              placeholder="Search Trade or Item Name..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
         </div>
       </div>
 
       {stockData.length === 0 ? (
-        <div className="empty-state">No stock information found.</div>
+        <div className="empty-state">No stock information found for selected filters.</div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
           {stockData.map((t, idx) => (
@@ -1087,7 +1424,9 @@ function AvailableStockSection() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border)", paddingBottom: "10px", flexWrap: "wrap", gap: "10px" }}>
                 <div>
                   <span style={{ fontWeight: 700, fontSize: "15px", color: "var(--accent)" }}>🛡️ {t.trade}</span>
-                  <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "2px" }}>Summary of toolkit parts & kit configurations</div>
+                  <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "2px" }}>
+                    Summary of toolkit parts & kit configurations {filterFirm ? `(${filterFirm})` : ""}
+                  </div>
                 </div>
                 <div style={{ display: "flex", gap: "15px", alignItems: "center" }}>
                   <div style={{ textAlign: "right" }}>

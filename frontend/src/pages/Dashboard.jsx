@@ -1,6 +1,6 @@
 import Navbar from "../components/Navbar";
 import { useEffect, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import api from "../api/api";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -12,6 +12,7 @@ import { FiBox, FiCheckCircle, FiTruck, FiDownload, FiSun, FiMoon, FiBell, FiRot
 import { isWarehouseManager, getWarehouseName, isReadOnly } from "../utils/auth";
 
 function Dashboard() {
+  const navigate = useNavigate();
   const [data, setData] = useState({
     total_kits: 0,
     total_dispatched: 0,
@@ -35,10 +36,10 @@ function Dashboard() {
   const [activeDashboardTab, setActiveDashboardTab] = useState("overview"); // "overview" | "offering" | "summary"
   const [reports, setReports] = useState({ months: [], offering_report: [], summary_report: [] });
   const [reportsLoading, setReportsLoading] = useState(false);
-  const [dashboardLoading, setDashboardLoading] = useState(true);
   const [editingRowKey, setEditingRowKey] = useState(null);
   const [editVal, setEditVal] = useState("");
   const [theme, setTheme] = useState(localStorage.getItem("theme") || "light");
+  const [dashboardLoading, setDashboardLoading] = useState(true);
   const [selectedOfferingMonth, setSelectedOfferingMonth] = useState("");
   const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
 
@@ -81,8 +82,22 @@ function Dashboard() {
     }
   }, [location.search]);
 
+  useEffect(() => {
+    const handleThemeChange = () => {
+      const currentTheme = localStorage.getItem("theme") || "light";
+      setTheme(currentTheme);
+      document.documentElement.setAttribute("data-theme", currentTheme);
+    };
+    window.addEventListener("themechange", handleThemeChange);
+    return () => window.removeEventListener("themechange", handleThemeChange);
+  }, []);
+
   const toggleTheme = () => {
-    setTheme(prev => prev === "light" ? "dark" : "light");
+    const nextTheme = theme === "light" ? "dark" : "light";
+    setTheme(nextTheme);
+    localStorage.setItem("theme", nextTheme);
+    document.documentElement.setAttribute("data-theme", nextTheme);
+    window.dispatchEvent(new Event("themechange"));
   };
 
   const fetchDashboard = async () => {
@@ -384,7 +399,7 @@ function Dashboard() {
 
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-
+        
         {/* Trade Wise Month Wise Offering (Pie Chart + Month Summary) */}
         {selectedOfferingMonth && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "24px" }}>
@@ -761,7 +776,7 @@ function Dashboard() {
 
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-
+        
         {/* Value Summary Cards Grid */}
         <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "20px" }}>
           <div className="glass-card interactive-stat-card" style={{ padding: "20px 22px", borderRadius: "var(--radius-lg)" }}>
@@ -798,16 +813,16 @@ function Dashboard() {
               <AreaChart data={cumulativeData}>
                 <defs>
                   <linearGradient id="colorAccent" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.35} />
-                    <stop offset="95%" stopColor="var(--accent)" stopOpacity={0} />
+                    <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.35}/>
+                    <stop offset="95%" stopColor="var(--accent)" stopOpacity={0}/>
                   </linearGradient>
                   <linearGradient id="colorSuccess" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--success)" stopOpacity={0.35} />
-                    <stop offset="95%" stopColor="var(--success)" stopOpacity={0} />
+                    <stop offset="5%" stopColor="var(--success)" stopOpacity={0.35}/>
+                    <stop offset="95%" stopColor="var(--success)" stopOpacity={0}/>
                   </linearGradient>
                   <linearGradient id="colorWarning" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--warning)" stopOpacity={0.35} />
-                    <stop offset="95%" stopColor="var(--warning)" stopOpacity={0} />
+                    <stop offset="5%" stopColor="var(--warning)" stopOpacity={0.35}/>
+                    <stop offset="95%" stopColor="var(--warning)" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
@@ -930,7 +945,7 @@ function Dashboard() {
           <div style={{ fontWeight: 700, fontSize: "24px", color: "var(--text-primary)", letterSpacing: "0.3px" }}>
             Warehouse Management Portal
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "24px" }}>
+          <div className="desktop-header-controls" style={{ display: "flex", alignItems: "center", gap: "24px" }}>
 
             {/* Theme Switcher Toggle (Moved left to Notification Bell) */}
             <button
@@ -987,8 +1002,19 @@ function Dashboard() {
               }} />
             </Link>
 
-            {/* Profile info block */}
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", borderLeft: "1px solid var(--border)", paddingLeft: "20px" }}>
+            {/* Profile info block — Click to navigate to Users */}
+            <div
+              onClick={() => navigate("/users")}
+              title="Click to view Users Management"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                borderLeft: "1px solid var(--border)",
+                paddingLeft: "20px",
+                cursor: "pointer"
+              }}
+            >
               <div className="avatar" style={{ width: "32px", height: "32px", fontSize: "12px", fontWeight: "700" }}>
                 {role ? role.charAt(0).toUpperCase() : "A"}
               </div>
@@ -1003,309 +1029,273 @@ function Dashboard() {
           </div>
         </div>
 
-        {dashboardLoading ? (
-          <div style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            minHeight: "400px",
-            gap: "16px",
-            background: "var(--bg-surface)",
-            borderRadius: "var(--radius-lg)",
-            border: "1px solid var(--border)",
-            margin: "20px 0",
-            boxShadow: "var(--shadow)"
-          }}>
-            <div className="loading-spinner" style={{
-              width: "48px",
-              height: "48px",
-              border: "4px solid var(--accent-soft)",
-              borderTop: "4px solid var(--accent)",
-              borderRadius: "50%",
-              animation: "spin 1s linear infinite"
-            }} />
-            <div style={{ color: "var(--text-secondary)", fontSize: "14px", fontWeight: "600" }}>
-              Loading operations dashboard...
-            </div>
-            <style>{`
-            @keyframes spin {
-              0% { transform: rotate(0deg); }
-              100% { transform: rotate(360deg); }
-            }
-          `}</style>
+        {/* Dashboard Title & Actions Row */}
+        <div className="page-header" style={{ marginBottom: "20px" }}>
+          <div>
+            <h1 className="page-title">
+              {activeDashboardTab === "overview" && "Operations Dashboard"}
+              {activeDashboardTab === "offering" && "Trade Offering"}
+              {activeDashboardTab === "summary" && "Cumulative Summary"}
+            </h1>
+            <p className="page-subtitle">Real-time manual entries analytics overview</p>
           </div>
-        ) : (
+          {activeDashboardTab === "overview" && (
+            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+              <button className="btn btn-ghost btn-sm" onClick={exportPDF}>
+                <FiDownload size={13} /> PDF
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={exportExcel}>
+                <FiDownload size={13} /> Excel
+              </button>
+              <button
+                className="btn btn-sm"
+                onClick={generateWhatsAppSummary}
+                style={{
+                  background: "#25d366",
+                  borderColor: "#25d366",
+                  color: "#fff",
+                  fontWeight: "600",
+                  fontSize: "12px",
+                  padding: "8px 12px",
+                  borderRadius: "6px",
+                  border: "none",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px"
+                }}
+              >
+                💬 WhatsApp Summary
+              </button>
+            </div>
+          )}
+        </div>
+        {activeDashboardTab === "overview" && (
+          <div className="glass-card" style={{
+            padding: "16px 20px",
+            borderRadius: "var(--radius-md)",
+            marginBottom: "24px",
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "20px",
+            alignItems: "flex-end"
+          }}>
+            <div style={{ flex: 1, minWidth: "150px" }}>
+              <label className="form-label" style={{ fontWeight: 600, fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--text-muted)", marginBottom: "6px", display: "block" }}>Warehouse Location</label>
+              <select
+                className="form-select"
+                value={selectedWarehouse}
+                onChange={(e) => setSelectedWarehouse(e.target.value)}
+                style={{ width: "100%", height: "36px", fontSize: "13px" }}
+                disabled={isWarehouseManager()}
+              >
+                {isWarehouseManager() ? (
+                  <option value={getWarehouseName()}>{getWarehouseName()}</option>
+                ) : (
+                  <>
+                    <option value="All">All Locations</option>
+                    {data.warehouses && data.warehouses.map(w => (
+                      <option key={w} value={w}>{w}</option>
+                    ))}
+                  </>
+                )}
+              </select>
+            </div>
+
+            <div style={{ flex: 1, minWidth: "150px" }}>
+              <label className="form-label" style={{ fontWeight: 600, fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--text-muted)", marginBottom: "6px", display: "block" }}>Trade Type</label>
+              <select
+                className="form-select"
+                value={selectedTrade}
+                onChange={(e) => setSelectedTrade(e.target.value)}
+                style={{ width: "100%", height: "36px", fontSize: "13px" }}
+              >
+                <option value="All">All Trades</option>
+                {data.trades && data.trades.map(t => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ flex: 0.8, minWidth: "120px" }}>
+              <label className="form-label" style={{ fontWeight: 600, fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--text-muted)", marginBottom: "6px", display: "block" }}>Month</label>
+              <select
+                className="form-select"
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                style={{ width: "100%", height: "36px", fontSize: "13px" }}
+              >
+                <option value="All">All Months</option>
+                {[
+                  { val: "1", label: "January" },
+                  { val: "2", label: "February" },
+                  { val: "3", label: "March" },
+                  { val: "4", label: "April" },
+                  { val: "5", label: "May" },
+                  { val: "6", label: "June" },
+                  { val: "7", label: "July" },
+                  { val: "8", label: "August" },
+                  { val: "9", label: "September" },
+                  { val: "10", label: "October" },
+                  { val: "11", label: "November" },
+                  { val: "12", label: "December" }
+                ].map(m => (
+                  <option key={m.val} value={m.val}>{m.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ flex: 0.8, minWidth: "120px" }}>
+              <label className="form-label" style={{ fontWeight: 600, fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--text-muted)", marginBottom: "6px", display: "block" }}>Year</label>
+              <select
+                className="form-select"
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                style={{ width: "100%", height: "36px", fontSize: "13px" }}
+              >
+                <option value="All">All Years</option>
+                {data.years && data.years.map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
+        {/* Tab Content */}
+        {dashboardLoading ? (
           <>
-            {/* Dashboard Title & Actions Row */}
-            <div className="page-header" style={{ marginBottom: "20px" }}>
-              <div>
-                <h1 className="page-title">
-                  {activeDashboardTab === "overview" && "Operations Dashboard"}
-                  {activeDashboardTab === "offering" && "Trade Offering"}
-                  {activeDashboardTab === "summary" && "Cumulative Summary"}
-                </h1>
-                <p className="page-subtitle">Real-time manual entries analytics overview</p>
+            {renderStatsSkeleton()}
+            {renderChartSkeleton()}
+          </>
+        ) : (
+          activeDashboardTab === "overview" && (
+            <>
+              {/* Workflow Stats cards (4 Columns) */}
+              <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "20px" }}>
+                {stats.map((s) => (
+                  <div className="glass-card interactive-stat-card" key={s.label} style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "20px 22px", borderRadius: "var(--radius-lg)" }}>
+                    <div>
+                      <div className={`stat-icon ${s.gradientClass}`}>
+                        {s.icon}
+                      </div>
+                      <div className="stat-label">{s.label}</div>
+                      <div className="stat-value" style={{ color: s.color }}>{s.value}</div>
+                    </div>
+                    {s.label === "Inspected Qty" && (
+                      <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "8px", borderTop: "1px solid var(--border)", paddingTop: "6px", display: "flex", flexWrap: "wrap", gap: "10px" }}>
+                        <span style={{ color: "var(--success)", fontWeight: 600 }}>✔ Pass: {data.inspected_passed}</span>
+                        <span style={{ color: "var(--danger)", fontWeight: 600 }}>✘ Fail: {data.inspected_failed}</span>
+                        <span style={{ color: "var(--accent)", fontWeight: 600 }}>⏳ Pend: {data.inspected_pending || 0}</span>
+                      </div>
+                    )}
+                    {s.label === "Dispatched Qty" && (
+                      <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "8px", borderTop: "1px solid var(--border)", paddingTop: "6px", display: "flex", flexDirection: "column", gap: "4px" }}>
+                        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                          <span style={{ color: "var(--warning)", fontWeight: 600 }}>📦 Pend: {data.dispatch_pending_mark || 0}</span>
+                          <span style={{ color: "var(--accent)", fontWeight: 600 }}>🚚 Transit: {data.dispatch_in_transit || 0}</span>
+                          <span style={{ color: "var(--success)", fontWeight: 600 }}>✅ Sent: {data.dispatch_dispatched || 0}</span>
+                        </div>
+                      </div>
+                    )}
+                    {s.label === "Returned Qty" && (
+                      <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "8px", borderTop: "1px solid var(--border)", paddingTop: "6px" }}>
+                        <span style={{ color: "var(--danger)", fontWeight: 600 }}>🔄 Count: {data.total_returned || 0} lots</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
-              {activeDashboardTab === "overview" && (
-                <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                  <button className="btn btn-ghost btn-sm" onClick={exportPDF}>
-                    <FiDownload size={13} /> PDF
-                  </button>
-                  <button className="btn btn-ghost btn-sm" onClick={exportExcel}>
-                    <FiDownload size={13} /> Excel
-                  </button>
-                  <button
-                    className="btn btn-sm"
-                    onClick={generateWhatsAppSummary}
-                    style={{
-                      background: "#25d366",
-                      borderColor: "#25d366",
-                      color: "#fff",
-                      fontWeight: "600",
-                      fontSize: "12px",
-                      padding: "8px 12px",
-                      borderRadius: "6px",
-                      border: "none",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px"
-                    }}
-                  >
-                    💬 WhatsApp Summary
-                  </button>
+
+              {/* Low Stock Alerts */}
+              {data.low_stock_items && data.low_stock_items.length > 0 && (
+                <div className="card" style={{ marginTop: "24px", borderColor: "rgba(239, 68, 68, 0.2)", background: "rgba(239, 68, 68, 0.02)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--danger)", fontWeight: 700, fontSize: "13px", marginBottom: "12px" }}>
+                    ⚠️ Low Stock Alert (Items under 50 units)
+                  </div>
+                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                    {data.low_stock_items.map((item) => (
+                      <div
+                        key={item.item_name}
+                        style={{
+                          background: "var(--bg-surface)",
+                          border: "1px solid var(--border)",
+                          borderRadius: "6px",
+                          padding: "8px 12px",
+                          fontSize: "12px",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          boxShadow: "0 1px 3px rgba(0,0,0,0.02)"
+                        }}
+                      >
+                        <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{item.item_name}</span>
+                        <span className="badge badge-red" style={{ fontWeight: "700", padding: "2px 6px" }}>
+                          {item.stock} left
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
-            </div>
-            {activeDashboardTab === "overview" && (
-              <div className="glass-card" style={{
-                padding: "16px 20px",
-                borderRadius: "var(--radius-md)",
-                marginBottom: "24px",
-                display: "flex",
-                flexWrap: "wrap",
-                gap: "20px",
-                alignItems: "flex-end"
-              }}>
-                <div style={{ flex: 1, minWidth: "150px" }}>
-                  <label className="form-label" style={{ fontWeight: 600, fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--text-muted)", marginBottom: "6px", display: "block" }}>Warehouse Location</label>
-                  <select
-                    className="form-select"
-                    value={selectedWarehouse}
-                    onChange={(e) => setSelectedWarehouse(e.target.value)}
-                    style={{ width: "100%", height: "36px", fontSize: "13px" }}
-                    disabled={isWarehouseManager()}
-                  >
-                    {isWarehouseManager() ? (
-                      <option value={getWarehouseName()}>{getWarehouseName()}</option>
-                    ) : (
-                      <>
-                        <option value="All">All Locations</option>
-                        {data.warehouses && data.warehouses.map(w => (
-                          <option key={w} value={w}>{w}</option>
-                        ))}
-                      </>
-                    )}
-                  </select>
+
+              {/* Monthly Summary Chart (Full Width) */}
+              <div className="glass-card" style={{ padding: "24px", borderRadius: "var(--radius-lg)", marginTop: "24px" }}>
+                <div className="card-title">Monthly Summary - Kits Made vs Inspected vs Dispatched</div>
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart data={data.monthly_summary || []}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                    <XAxis dataKey="name" tick={{ fill: "var(--text-secondary)", fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: "var(--text-secondary)", fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend formatter={(value) => <span style={{ color: "var(--text-secondary)", fontSize: 12 }}>{value}</span>} />
+                    <Bar dataKey="Kits Made" fill="var(--accent)" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Inspected" fill="var(--success)" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Dispatched" fill="var(--warning)" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Bottom charts row — Responsive grid for mobile stacking */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "24px", marginTop: "24px" }}>
+                <div className="glass-card" style={{ padding: "24px", borderRadius: "var(--radius-lg)" }}>
+                  <div className="card-title">Yearly Summary</div>
+                  <ResponsiveContainer width="100%" height={260}>
+                    <BarChart data={data.yearly_summary || []}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                      <XAxis dataKey="name" tick={{ fill: "var(--text-secondary)", fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fill: "var(--text-secondary)", fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend formatter={(value) => <span style={{ color: "var(--text-secondary)", fontSize: 12 }}>{value}</span>} />
+                      <Bar dataKey="Kits Made" fill="var(--accent)" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="Inspected" fill="var(--success)" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="Dispatched" fill="var(--warning)" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
 
-                <div style={{ flex: 1, minWidth: "150px" }}>
-                  <label className="form-label" style={{ fontWeight: 600, fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--text-muted)", marginBottom: "6px", display: "block" }}>Trade Type</label>
-                  <select
-                    className="form-select"
-                    value={selectedTrade}
-                    onChange={(e) => setSelectedTrade(e.target.value)}
-                    style={{ width: "100%", height: "36px", fontSize: "13px" }}
-                  >
-                    <option value="All">All Trades</option>
-                    {data.trades && data.trades.map(t => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div style={{ flex: 0.8, minWidth: "120px" }}>
-                  <label className="form-label" style={{ fontWeight: 600, fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--text-muted)", marginBottom: "6px", display: "block" }}>Month</label>
-                  <select
-                    className="form-select"
-                    value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(e.target.value)}
-                    style={{ width: "100%", height: "36px", fontSize: "13px" }}
-                  >
-                    <option value="All">All Months</option>
-                    {[
-                      { val: "1", label: "January" },
-                      { val: "2", label: "February" },
-                      { val: "3", label: "March" },
-                      { val: "4", label: "April" },
-                      { val: "5", label: "May" },
-                      { val: "6", label: "June" },
-                      { val: "7", label: "July" },
-                      { val: "8", label: "August" },
-                      { val: "9", label: "September" },
-                      { val: "10", label: "October" },
-                      { val: "11", label: "November" },
-                      { val: "12", label: "December" }
-                    ].map(m => (
-                      <option key={m.val} value={m.val}>{m.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div style={{ flex: 0.8, minWidth: "120px" }}>
-                  <label className="form-label" style={{ fontWeight: 600, fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--text-muted)", marginBottom: "6px", display: "block" }}>Year</label>
-                  <select
-                    className="form-select"
-                    value={selectedYear}
-                    onChange={(e) => setSelectedYear(e.target.value)}
-                    style={{ width: "100%", height: "36px", fontSize: "13px" }}
-                  >
-                    <option value="All">All Years</option>
-                    {data.years && data.years.map(y => (
-                      <option key={y} value={y}>{y}</option>
-                    ))}
-                  </select>
+                <div className="glass-card" style={{ padding: "24px", borderRadius: "var(--radius-lg)" }}>
+                  <div className="card-title">Warehouse Location Wise Summary</div>
+                  <ResponsiveContainer width="100%" height={260}>
+                    <BarChart data={data.location_summary || []}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                      <XAxis dataKey="name" tick={{ fill: "var(--text-secondary)", fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fill: "var(--text-secondary)", fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend formatter={(value) => <span style={{ color: "var(--text-secondary)", fontSize: 12 }}>{value}</span>} />
+                      <Bar dataKey="Kits Made" fill="var(--accent)" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="Dispatched" fill="var(--warning)" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
               </div>
-            )}
-
-            {/* Tab Content */}
-            {dashboardLoading ? (
-              <>
-                {renderStatsSkeleton()}
-                {renderChartSkeleton()}
-              </>
-            ) : (
-              activeDashboardTab === "overview" && (
-                <>
-                  {/* Workflow Stats cards (4 Columns) */}
-                  <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "20px" }}>
-                    {stats.map((s) => (
-                      <div className="glass-card interactive-stat-card" key={s.label} style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "20px 22px", borderRadius: "var(--radius-lg)" }}>
-                        <div>
-                          <div className={`stat-icon ${s.gradientClass}`}>
-                            {s.icon}
-                          </div>
-                          <div className="stat-label">{s.label}</div>
-                          <div className="stat-value" style={{ color: s.color }}>{s.value}</div>
-                        </div>
-                        {s.label === "Inspected Qty" && (
-                          <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "8px", borderTop: "1px solid var(--border)", paddingTop: "6px", display: "flex", flexWrap: "wrap", gap: "10px" }}>
-                            <span style={{ color: "var(--success)", fontWeight: 600 }}>✔ Pass: {data.inspected_passed}</span>
-                            <span style={{ color: "var(--danger)", fontWeight: 600 }}>✘ Fail: {data.inspected_failed}</span>
-                            <span style={{ color: "var(--accent)", fontWeight: 600 }}>⏳ Pend: {data.inspected_pending || 0}</span>
-                          </div>
-                        )}
-                        {s.label === "Dispatched Qty" && (
-                          <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "8px", borderTop: "1px solid var(--border)", paddingTop: "6px", display: "flex", flexDirection: "column", gap: "4px" }}>
-                            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                              <span style={{ color: "var(--warning)", fontWeight: 600 }}>📦 Pend: {data.dispatch_pending_mark || 0}</span>
-                              <span style={{ color: "var(--accent)", fontWeight: 600 }}>🚚 Transit: {data.dispatch_in_transit || 0}</span>
-                              <span style={{ color: "var(--success)", fontWeight: 600 }}>✅ Sent: {data.dispatch_dispatched || 0}</span>
-                            </div>
-                          </div>
-                        )}
-                        {s.label === "Returned Qty" && (
-                          <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "8px", borderTop: "1px solid var(--border)", paddingTop: "6px" }}>
-                            <span style={{ color: "var(--danger)", fontWeight: 600 }}>🔄 Count: {data.total_returned || 0} lots</span>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Low Stock Alerts */}
-                  {data.low_stock_items && data.low_stock_items.length > 0 && (
-                    <div className="card" style={{ marginTop: "24px", borderColor: "rgba(239, 68, 68, 0.2)", background: "rgba(239, 68, 68, 0.02)" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--danger)", fontWeight: 700, fontSize: "13px", marginBottom: "12px" }}>
-                        ⚠️ Low Stock Alert (Items under 50 units)
-                      </div>
-                      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                        {data.low_stock_items.map((item) => (
-                          <div
-                            key={item.item_name}
-                            style={{
-                              background: "var(--bg-surface)",
-                              border: "1px solid var(--border)",
-                              borderRadius: "6px",
-                              padding: "8px 12px",
-                              fontSize: "12px",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "8px",
-                              boxShadow: "0 1px 3px rgba(0,0,0,0.02)"
-                            }}
-                          >
-                            <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{item.item_name}</span>
-                            <span className="badge badge-red" style={{ fontWeight: "700", padding: "2px 6px" }}>
-                              {item.stock} left
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Monthly Summary Chart (Full Width) */}
-                  <div className="glass-card" style={{ padding: "24px", borderRadius: "var(--radius-lg)", marginTop: "24px" }}>
-                    <div className="card-title">Monthly Summary - Kits Made vs Inspected vs Dispatched</div>
-                    <ResponsiveContainer width="100%" height={280}>
-                      <BarChart data={data.monthly_summary || []}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                        <XAxis dataKey="name" tick={{ fill: "var(--text-secondary)", fontSize: 11 }} axisLine={false} tickLine={false} />
-                        <YAxis tick={{ fill: "var(--text-secondary)", fontSize: 11 }} axisLine={false} tickLine={false} />
-                        <Tooltip content={<CustomTooltip />} />
-                        <Legend formatter={(value) => <span style={{ color: "var(--text-secondary)", fontSize: 12 }}>{value}</span>} />
-                        <Bar dataKey="Kits Made" fill="var(--accent)" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="Inspected" fill="var(--success)" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="Dispatched" fill="var(--warning)" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-
-                  {/* Bottom charts row */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px", marginTop: "24px" }}>
-                    <div className="glass-card" style={{ padding: "24px", borderRadius: "var(--radius-lg)" }}>
-                      <div className="card-title">Yearly Summary</div>
-                      <ResponsiveContainer width="100%" height={260}>
-                        <BarChart data={data.yearly_summary || []}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                          <XAxis dataKey="name" tick={{ fill: "var(--text-secondary)", fontSize: 11 }} axisLine={false} tickLine={false} />
-                          <YAxis tick={{ fill: "var(--text-secondary)", fontSize: 11 }} axisLine={false} tickLine={false} />
-                          <Tooltip content={<CustomTooltip />} />
-                          <Legend formatter={(value) => <span style={{ color: "var(--text-secondary)", fontSize: 12 }}>{value}</span>} />
-                          <Bar dataKey="Kits Made" fill="var(--accent)" radius={[4, 4, 0, 0]} />
-                          <Bar dataKey="Inspected" fill="var(--success)" radius={[4, 4, 0, 0]} />
-                          <Bar dataKey="Dispatched" fill="var(--warning)" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-
-                    <div className="glass-card" style={{ padding: "24px", borderRadius: "var(--radius-lg)" }}>
-                      <div className="card-title">Warehouse Location Wise Summary</div>
-                      <ResponsiveContainer width="100%" height={260}>
-                        <BarChart data={data.location_summary || []}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                          <XAxis dataKey="name" tick={{ fill: "var(--text-secondary)", fontSize: 11 }} axisLine={false} tickLine={false} />
-                          <YAxis tick={{ fill: "var(--text-secondary)", fontSize: 11 }} axisLine={false} tickLine={false} />
-                          <Tooltip content={<CustomTooltip />} />
-                          <Legend formatter={(value) => <span style={{ color: "var(--text-secondary)", fontSize: 12 }}>{value}</span>} />
-                          <Bar dataKey="Kits Made" fill="var(--accent)" radius={[4, 4, 0, 0]} />
-                          <Bar dataKey="Dispatched" fill="var(--warning)" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                </>
-              )
-            )}
-
-            {activeDashboardTab === "offering" && renderOfferingTable()}
-
-            {activeDashboardTab === "summary" && renderSummaryTable()}
-          </>
+            </>
+          )
         )}
+
+        {activeDashboardTab === "offering" && renderOfferingTable()}
+
+        {activeDashboardTab === "summary" && renderSummaryTable()}
       </div>
     </div>
   );
