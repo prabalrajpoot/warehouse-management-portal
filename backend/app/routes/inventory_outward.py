@@ -19,6 +19,7 @@ class OutwardCreate(BaseModel):
     qty: Optional[int] = None
     warehouse_from: Optional[str] = None
     warehouse_to: Optional[str] = None
+    firm_name: Optional[str] = None
 
 
 @router.post("/inventory-outward")
@@ -35,7 +36,8 @@ def create_outward(
         trade_name=payload.trade_name,
         qty=payload.qty,
         warehouse_from=payload.warehouse_from,
-        warehouse_to=payload.warehouse_to
+        warehouse_to=payload.warehouse_to,
+        firm_name=payload.firm_name
     )
     db.add(new_entry)
     db.commit()
@@ -85,6 +87,7 @@ def update_outward(
     entry.qty = payload.qty  # type: ignore
     entry.warehouse_from = payload.warehouse_from  # type: ignore
     entry.warehouse_to = payload.warehouse_to  # type: ignore
+    entry.firm_name = payload.firm_name  # type: ignore
 
     db.commit()
     db.refresh(entry)

@@ -908,9 +908,11 @@ function Inspection() {
                   <button className="btn btn-primary btn-sm" onClick={queueSelectedForDispatch} style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                     🚚 Queue Selected ({selectedIds.length})
                   </button>
-                  <button className="btn btn-danger btn-sm" onClick={deleteSelected}>
-                    <FiTrash2 size={13} /> Delete Selected ({selectedIds.length})
-                  </button>
+                  {canDelete() && (
+                    <button className="btn btn-danger btn-sm" onClick={deleteSelected}>
+                      <FiTrash2 size={13} /> Delete Selected ({selectedIds.length})
+                    </button>
+                  )}
                 </div>
               )}
               {hasActiveFilters && (

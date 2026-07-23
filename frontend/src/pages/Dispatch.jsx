@@ -651,9 +651,11 @@ function DispatchLog() {
                 <button className="btn btn-outline btn-sm" onClick={markSelectedAsReturned} style={{ color: "var(--accent)", borderColor: "var(--accent)" }}>
                   🔄 Return Selected ({selectedIds.length})
                 </button>
-                <button className="btn btn-danger btn-sm" onClick={deleteSelected}>
-                  <FiTrash2 size={13} /> Delete Selected ({selectedIds.length})
-                </button>
+                {canDelete() && (
+                  <button className="btn btn-danger btn-sm" onClick={deleteSelected}>
+                    <FiTrash2 size={13} /> Delete Selected ({selectedIds.length})
+                  </button>
+                )}
               </div>
             )}
             {hasActiveFilters && (
@@ -1253,7 +1255,7 @@ function ReturnLog() {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", flexWrap: "wrap", gap: "12px" }}>
         <span style={{ fontWeight: 600, color: "var(--text-primary)", fontSize: "14px" }}>Return Logs ({filtered.length})</span>
         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-          {selectedIds.length > 0 && (
+          {selectedIds.length > 0 && canDelete() && (
             <button className="btn btn-danger btn-sm" onClick={deleteSelected}>
               <FiTrash2 size={13} /> Delete Selected ({selectedIds.length})
             </button>
@@ -1352,17 +1354,19 @@ function ReturnLog() {
                     <td>
                       <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                         <button className="btn-icon" title="Edit" onClick={() => startEditReturn(item)}><FiEdit2 size={13} /></button>
-                        {deleteConfirmId === item.id ? (
-                          <span style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "12px", color: "var(--danger)" }}>
-                            Sure?
-                            <button className="btn-icon" style={{ color: "var(--danger)" }} onClick={() => deleteReturn(item.id)}><FiCheck size={13} /></button>
-                            <button className="btn-icon" onClick={() => setDeleteConfirmId(null)}><FiX size={13} /></button>
-                          </span>
-                        ) : (
-                          <button className="btn-icon" title="Delete" style={{ color: "var(--danger)" }}
-                            onClick={() => { setDeleteConfirmId(item.id); setEditId(null); }}>
-                            <FiTrash2 size={13} />
-                          </button>
+                        {canDelete() && (
+                          deleteConfirmId === item.id ? (
+                            <span style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "12px", color: "var(--danger)" }}>
+                              Sure?
+                              <button className="btn-icon" style={{ color: "var(--danger)" }} onClick={() => deleteReturn(item.id)}><FiCheck size={13} /></button>
+                              <button className="btn-icon" onClick={() => setDeleteConfirmId(null)}><FiX size={13} /></button>
+                            </span>
+                          ) : (
+                            <button className="btn-icon" title="Delete" style={{ color: "var(--danger)" }}
+                              onClick={() => { setDeleteConfirmId(item.id); setEditId(null); }}>
+                              <FiTrash2 size={13} />
+                            </button>
+                          )
                         )}
                       </div>
                     </td>

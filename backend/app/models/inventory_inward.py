@@ -55,3 +55,8 @@ class InventoryInward(Base):
         String,
         nullable=True
     )
+
+    firm_name = Column(
+        String,
+        nullable=True
+    )

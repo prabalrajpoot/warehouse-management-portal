@@ -10,20 +10,7 @@ A full-stack Warehouse Management System built with **FastAPI**, **React (Vite)*
 
 https://warehouse-management-portal.vercel.app
 
-### Backend API
-
-https://warehouse-management-api-2qjn.onrender.com
-
-### API Documentation (Swagger)
-
-https://warehouse-management-api-2qjn.onrender.com/docs
-
-### ReDoc
-
-https://warehouse-management-api-2qjn.onrender.com/redoc
-
 ---
-
 # Features
 
 * User Authentication & Role-based Access

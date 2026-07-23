@@ -723,6 +723,12 @@ body,
   }
 }
 
+@media (max-width: 900px) {
+  .desktop-header-controls {
+    display: none !important;
+  }
+}
+
 /* Skeleton Loading Pulse */
 @keyframes skeleton-pulse {
   0% {

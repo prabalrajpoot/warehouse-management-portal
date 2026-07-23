@@ -1,6 +1,6 @@
 import Navbar from "../components/Navbar";
 import { useEffect, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import api from "../api/api";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -12,6 +12,7 @@ import { FiBox, FiCheckCircle, FiTruck, FiDownload, FiSun, FiMoon, FiBell, FiRot
 import { isWarehouseManager, getWarehouseName, isReadOnly } from "../utils/auth";
 
 function Dashboard() {
+  const navigate = useNavigate();
   const [data, setData] = useState({
     total_kits: 0,
     total_dispatched: 0,
@@ -81,8 +82,22 @@ function Dashboard() {
     }
   }, [location.search]);
 
+  useEffect(() => {
+    const handleThemeChange = () => {
+      const currentTheme = localStorage.getItem("theme") || "light";
+      setTheme(currentTheme);
+      document.documentElement.setAttribute("data-theme", currentTheme);
+    };
+    window.addEventListener("themechange", handleThemeChange);
+    return () => window.removeEventListener("themechange", handleThemeChange);
+  }, []);
+
   const toggleTheme = () => {
-    setTheme(prev => prev === "light" ? "dark" : "light");
+    const nextTheme = theme === "light" ? "dark" : "light";
+    setTheme(nextTheme);
+    localStorage.setItem("theme", nextTheme);
+    document.documentElement.setAttribute("data-theme", nextTheme);
+    window.dispatchEvent(new Event("themechange"));
   };
 
   const fetchDashboard = async () => {
@@ -930,7 +945,7 @@ function Dashboard() {
           <div style={{ fontWeight: 700, fontSize: "24px", color: "var(--text-primary)", letterSpacing: "0.3px" }}>
             Warehouse Management Portal
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "24px" }}>
+          <div className="desktop-header-controls" style={{ display: "flex", alignItems: "center", gap: "24px" }}>
 
             {/* Theme Switcher Toggle (Moved left to Notification Bell) */}
             <button
@@ -987,8 +1002,19 @@ function Dashboard() {
               }} />
             </Link>
 
-            {/* Profile info block */}
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", borderLeft: "1px solid var(--border)", paddingLeft: "20px" }}>
+            {/* Profile info block — Click to navigate to Users */}
+            <div
+              onClick={() => navigate("/users")}
+              title="Click to view Users Management"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                borderLeft: "1px solid var(--border)",
+                paddingLeft: "20px",
+                cursor: "pointer"
+              }}
+            >
               <div className="avatar" style={{ width: "32px", height: "32px", fontSize: "12px", fontWeight: "700" }}>
                 {role ? role.charAt(0).toUpperCase() : "A"}
               </div>
@@ -1230,8 +1256,8 @@ function Dashboard() {
                 </ResponsiveContainer>
               </div>
 
-              {/* Bottom charts row */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px", marginTop: "24px" }}>
+              {/* Bottom charts row — Responsive grid for mobile stacking */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "24px", marginTop: "24px" }}>
                 <div className="glass-card" style={{ padding: "24px", borderRadius: "var(--radius-lg)" }}>
                   <div className="card-title">Yearly Summary</div>
                   <ResponsiveContainer width="100%" height={260}>

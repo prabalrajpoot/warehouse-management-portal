@@ -20,6 +20,7 @@ class InwardCreate(BaseModel):
     item_name: Optional[str] = None
     brand_description: Optional[str] = None
     trade_name: Optional[str] = None
+    firm_name: Optional[str] = None
 
 
 @router.post("/inventory-inward")
@@ -37,7 +38,8 @@ def create_inward(
         short_damage_qty=payload.short_damage_qty,
         item_name=payload.item_name,
         brand_description=payload.brand_description,
-        trade_name=payload.trade_name
+        trade_name=payload.trade_name,
+        firm_name=payload.firm_name
     )
     db.add(new_entry)
     db.commit()
@@ -88,6 +90,7 @@ def update_inward(
     entry.item_name = payload.item_name  # type: ignore
     entry.brand_description = payload.brand_description  # type: ignore
     entry.trade_name = payload.trade_name  # type: ignore
+    entry.firm_name = payload.firm_name  # type: ignore
 
     db.commit()
     db.refresh(entry)

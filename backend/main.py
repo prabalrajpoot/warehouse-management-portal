@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from app.database.db import engine, Base
+from sqlalchemy import text
 from app.models import *
 
 from app.routes.auth import router as auth_router
@@ -29,7 +30,14 @@ from app.models.man_power import ManPower, ManPowerWorker
 import os
 from fastapi.middleware.cors import CORSMiddleware
 
-# Base.metadata.create_all(bind=engine)
+# Ensure firm_name column exists in PostgreSQL tables
+try:
+    with engine.connect() as conn:
+        conn.execute(text("ALTER TABLE inventory_inward ADD COLUMN IF NOT EXISTS firm_name VARCHAR;"))
+        conn.execute(text("ALTER TABLE inventory_outward ADD COLUMN IF NOT EXISTS firm_name VARCHAR;"))
+        conn.commit()
+except Exception as _e:
+    print("Database column alteration note:", _e)
 
 app = FastAPI()
 
