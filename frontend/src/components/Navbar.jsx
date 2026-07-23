@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import {
   FiGrid,
@@ -18,6 +18,7 @@ import {
   FiActivity,
   FiSun,
   FiMoon,
+  FiBell,
   FiMenu,
   FiX
 } from "react-icons/fi";
@@ -51,6 +52,7 @@ const ROLE_CONFIG = {
 
 function Navbar() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [role, setRole] = useState(null);
   const [warehouseName, setWarehouseName] = useState("");
 
@@ -82,14 +84,20 @@ function Navbar() {
 
   useEffect(() => {
     const handleThemeChange = () => {
-      setTheme(localStorage.getItem("theme") || "light");
+      const currentTheme = localStorage.getItem("theme") || "light";
+      setTheme(currentTheme);
+      document.documentElement.setAttribute("data-theme", currentTheme);
     };
     window.addEventListener("themechange", handleThemeChange);
     return () => window.removeEventListener("themechange", handleThemeChange);
   }, []);
 
   const toggleTheme = () => {
-    setTheme(prev => prev === "light" ? "dark" : "light");
+    const nextTheme = theme === "light" ? "dark" : "light";
+    setTheme(nextTheme);
+    localStorage.setItem("theme", nextTheme);
+    document.documentElement.setAttribute("data-theme", nextTheme);
+    window.dispatchEvent(new Event("themechange"));
   };
 
   useEffect(() => {
@@ -180,7 +188,7 @@ function Navbar() {
 
   return (
     <>
-      {/* Mobile top bar with hamburger — desktop is completely unaffected since this only renders when isMobile */}
+      {/* Mobile Header Bar */}
       {isMobile && (
         <div style={{
           position: "fixed",
@@ -196,6 +204,7 @@ function Navbar() {
           padding: "0 16px",
           zIndex: 999
         }}>
+          {/* Menu Button */}
           <button
             onClick={() => setMobileOpen(o => !o)}
             aria-label="Toggle menu"
@@ -214,8 +223,70 @@ function Navbar() {
           >
             {mobileOpen ? <FiX size={18} /> : <FiMenu size={18} />}
           </button>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: 700, color: "var(--text-primary)", fontSize: "15px" }}>
-            📦 Pragyawan
+
+          {/* Right Header Controls (Shifted from page header) */}
+          <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+            <button
+              onClick={toggleTheme}
+              style={{
+                background: "transparent",
+                border: "none",
+                color: "var(--text-secondary)",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "6px",
+                borderRadius: "50%"
+              }}
+              title={theme === "light" ? "Switch to Dark Mode" : "Switch to Light Mode"}
+            >
+              {theme === "light" ? <FiMoon size={18} style={{ color: "var(--accent)" }} /> : <FiSun size={18} style={{ color: "var(--warning)" }} />}
+            </button>
+
+            <Link
+              to="/activity-logs"
+              title="Activity Logs Notifications"
+              style={{
+                color: "var(--text-secondary)",
+                display: "flex",
+                alignItems: "center",
+                position: "relative"
+              }}
+            >
+              <FiBell size={18} />
+              <span style={{
+                position: "absolute",
+                top: "-2px",
+                right: "-2px",
+                width: "7px",
+                height: "7px",
+                background: "var(--danger)",
+                borderRadius: "50%",
+                border: "2px solid var(--bg-surface)"
+              }} />
+            </Link>
+
+            <div
+              onClick={() => navigate("/users")}
+              title="Manage Users"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                cursor: "pointer"
+              }}
+            >
+              <div className="avatar" style={{ width: "28px", height: "28px", fontSize: "11px", fontWeight: "700" }}>
+                {role ? role.charAt(0).toUpperCase() : "A"}
+              </div>
+              <div style={{ fontSize: "11px", fontWeight: "700", color: "var(--text-primary)", lineHeight: 1.2 }}>
+                User
+                <div style={{ fontSize: "9px", color: "var(--accent)", textTransform: "capitalize", fontWeight: "600" }}>
+                  {role ? role.replace("_", " ") : "Admin"}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -250,37 +321,30 @@ function Navbar() {
         >
           {/* Logo */}
           <div style={{
-            padding: "28px 20px 16px",
+            padding: "20px 16px 14px",
             borderBottom: "1px solid var(--border)",
             marginBottom: "12px"
           }}>
             <div style={{
+              background: "#ffffff",
+              padding: "8px 12px",
+              borderRadius: "12px",
+              border: "1px solid var(--border)",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
               display: "flex",
               alignItems: "center",
-              gap: "10px",
+              justifyContent: "center",
               marginBottom: "12px"
             }}>
-              <div style={{
-                width: "36px",
-                height: "36px",
-                background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-                borderRadius: "10px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "18px",
-                flexShrink: 0
-              }}>
-                📦
-              </div>
-              <div>
-                <div style={{ color: "var(--text-primary)", fontWeight: "700", fontSize: "18px" }}>
-                  Pragyawan
-                </div>
-                <div style={{ color: "var(--text-secondary)", fontSize: "12px" }}>
-                  Technologies Limited
-                </div>
-              </div>
+              <img
+                src="/logo.png"
+                alt="Pragyawan Technologies Limited"
+                style={{
+                  maxHeight: "44px",
+                  maxWidth: "100%",
+                  objectFit: "contain"
+                }}
+              />
             </div>
 
             {/* Role Badge */}

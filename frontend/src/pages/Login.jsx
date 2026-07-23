@@ -43,20 +43,21 @@ function Login() {
         {/* Left Side: Branding & Info */}
         <div className="login-left-panel">
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "24px" }}>
-              <div style={{
-                width: "42px",
-                height: "42px",
-                background: "rgba(255, 255, 255, 0.15)",
-                borderRadius: "12px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "20px"
-              }}>
-                📦
-              </div>
-              <span style={{ fontWeight: 800, fontSize: "18px", letterSpacing: "0.5px" }}>WMS Portal</span>
+            <div style={{
+              background: "#ffffff",
+              padding: "10px 16px",
+              borderRadius: "14px",
+              display: "inline-flex",
+              alignItems: "center",
+              marginBottom: "24px",
+              boxShadow: "0 4px 16px rgba(0, 0, 0, 0.12)",
+              border: "1px solid rgba(255, 255, 255, 0.3)"
+            }}>
+              <img
+                src="/logo.png"
+                alt="Pragyawan Technologies Limited"
+                style={{ height: "42px", objectFit: "contain" }}
+              />
             </div>
 
             <h2 style={{ fontSize: "24px", fontWeight: 800, marginBottom: "12px", lineHeight: 1.25 }}>

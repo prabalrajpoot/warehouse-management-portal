@@ -50,3 +50,8 @@ class InventoryOutward(Base):
         String,
         nullable=True
     )
+
+    firm_name = Column(
+        String,
+        nullable=True
+    )

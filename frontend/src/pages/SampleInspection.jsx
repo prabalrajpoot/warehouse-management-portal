@@ -2,8 +2,10 @@ import { useState, useEffect } from "react";
 import Loader from "../components/Loader";
 import Navbar from "../components/Navbar";
 import api from "../api/api";
-import { FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch, FiEye } from "react-icons/fi";
-import { isReadOnly } from "../utils/auth";
+import { FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch, FiEye, FiDownload, FiUpload } from "react-icons/fi";
+import { isReadOnly, isWarehouseManager } from "../utils/auth";
+import jsPDF from "jspdf";
+import * as XLSX from "xlsx";
 
 const FIRM_OPTIONS = ["ITI", "PTL", "VTL"];
 
@@ -210,6 +212,118 @@ function SampleInspection() {
     }
   };
 
+  const exportPDF = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(14);
+    doc.text(activeTab === "factory" ? "Factory Sample Inspection Report" : "Sample Approved Inspection Report", 20, 20);
+    doc.setFontSize(9);
+    const headers = ["#", "Date", "Firm", "Warehouse", "Trade", "Sample Name", "Qty", "Status", "Remarks"];
+    doc.text(headers.join(" | "), 20, 32);
+    doc.line(20, 35, 190, 35);
+    let yPos = 42;
+    filtered.forEach((item, idx) => {
+      if (yPos > 280) { doc.addPage(); yPos = 20; }
+      const row = [
+        String(idx + 1),
+        item.date || "—",
+        item.firm || "—",
+        item.warehouse_name || "—",
+        item.trade || "—",
+        item.sample_name || "—",
+        String(item.quantity ?? 1),
+        item.status || "Pending",
+        item.remarks || "—"
+      ];
+      doc.text(row.join(" | "), 20, yPos);
+      yPos += 8;
+    });
+    doc.save(activeTab === "factory" ? "factory_sample_report.pdf" : "sample_approved_report.pdf");
+  };
+
+  const exportExcel = () => {
+    const exportData = filtered.map((item, idx) => ({
+      "#": idx + 1,
+      "Inspection Date": item.date,
+      "Firm": item.firm,
+      "Warehouse": item.warehouse_name,
+      "Trade": item.trade,
+      "Sample Name": item.sample_name,
+      "Quantity": item.quantity,
+      "Status": item.status,
+      "Remarks": item.remarks
+    }));
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Sample Inspection");
+    XLSX.writeFile(wb, activeTab === "factory" ? "factory_sample_report.xlsx" : "sample_approved_report.xlsx");
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (isWarehouseManager()) {
+      const proceed = window.confirm(
+        "⚠️ Attention: Please ensure that all entries in your Excel file are valid and correct before uploading. As a Warehouse Manager, you will not have permission to delete entries once they are imported. Do you want to proceed with the upload?"
+      );
+      if (!proceed) {
+        e.target.value = "";
+        return;
+      }
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target.result;
+        const wb = XLSX.read(bstr, { type: "binary" });
+        const wsName = wb.SheetNames[0];
+        const ws = wb.Sheets[wsName];
+        const data = XLSX.utils.sheet_to_json(ws);
+
+        if (!data || data.length === 0) {
+          alert("The uploaded Excel file appears to be empty.");
+          return;
+        }
+
+        let successCount = 0;
+        for (const row of data) {
+          const date = row["Inspection Date"] || row["Date"] || row["date"] || "";
+          const firm = row["Firm"] || row["firm"] || "";
+          const warehouse_name = row["Warehouse"] || row["Warehouse Name"] || row["warehouse_name"] || "";
+          const trade = row["Trade"] || row["trade"] || "";
+          const sample_name = row["Sample Name"] || row["Sample"] || row["sample_name"] || "";
+          const quantity = row["Quantity"] || row["Qty"] || row["qty"] || 1;
+          const status = row["Status"] || row["status"] || "Pending";
+          const remarks = row["Remarks"] || row["remarks"] || "";
+
+          if (date && firm && warehouse_name && trade && sample_name) {
+            await api.post("/sample-inspections", {
+              date: toDMY(String(date)),
+              firm: String(firm),
+              warehouse_name: String(warehouse_name),
+              trade: String(trade),
+              sample_name: String(sample_name),
+              quantity: Number(quantity) || 1,
+              status: String(status),
+              remarks: String(remarks),
+              sample_type: activeTab === "approved" ? "approved" : "factory"
+            });
+            successCount++;
+          }
+        }
+        alert(`Successfully imported ${successCount} sample inspection record(s).`);
+        fetchRecords();
+      } catch (err) {
+        console.error(err);
+        alert("Failed to process Excel file.");
+      } finally {
+        e.target.value = "";
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
   // Filter based on active tab and search
   const filtered = records.filter(item => {
     // 1. Filter by sample type
@@ -273,11 +387,35 @@ function SampleInspection() {
             <h1 className="page-title">Sample Inspection Log</h1>
             <p className="page-subtitle">Track quality inspections of toolkit samples before final dispatch approval</p>
           </div>
-          {!isReadOnly() && (
-            <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setEditId(null); setMsg(""); }}>
-              <FiPlus size={14} /> {showForm ? "Cancel" : "Add Sample Log"}
+          <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+            <button className="btn btn-ghost btn-sm" onClick={exportPDF}>
+              <FiDownload size={13} /> PDF
             </button>
-          )}
+            <button className="btn btn-ghost btn-sm" onClick={exportExcel}>
+              <FiDownload size={13} /> Excel
+            </button>
+            {!isReadOnly() && (
+              <>
+                <input
+                  type="file"
+                  id="sample-excel-input"
+                  style={{ display: "none" }}
+                  accept=".xlsx, .xls, .csv"
+                  onChange={handleFileUpload}
+                />
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => document.getElementById("sample-excel-input").click()}
+                  style={{ display: "flex", gap: "6px", alignItems: "center" }}
+                >
+                  <FiUpload size={14} /> Upload Excel
+                </button>
+                <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setEditId(null); setMsg(""); }}>
+                  <FiPlus size={14} /> {showForm ? "Cancel" : "Add Sample Log"}
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Tabs */}
