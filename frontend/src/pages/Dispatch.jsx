@@ -788,8 +788,8 @@ function DispatchLog() {
                         <td><code>{item.ms_barcode || "—"}</code></td>
                         <td>
                           <span className={`badge ${item.packaging_status === "Dispatched" ? "badge-green" :
-                              item.packaging_status === "Already In Transit" ? "badge-blue" :
-                                "badge-orange"
+                            item.packaging_status === "Already In Transit" ? "badge-blue" :
+                              "badge-orange"
                             }`}>
                             {item.packaging_status || "Pending For Mark"}
                           </span>
@@ -1211,7 +1211,6 @@ function ReturnLog() {
     XLSX.writeFile(wb, "returns_report.xlsx");
   };
 
-  const [uploading, setUploading] = useState(false);
 
   const uploadExcelFile = (e) => {
     const file = e.target.files?.[0];

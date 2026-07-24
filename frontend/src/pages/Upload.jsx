@@ -7,10 +7,10 @@ import jsPDF from "jspdf";
 import * as XLSX from "xlsx";
 
 const statusColors = {
-  "Kitting":           "badge-blue",
+  "Kitting": "badge-blue",
   "Inspection Passed": "badge-green",
   "Inspection Failed": "badge-red",
-  "Dispatched":        "badge-purple",
+  "Dispatched": "badge-purple",
 };
 
 function Upload() {
@@ -55,7 +55,6 @@ function Upload() {
     fetchData(currentPage, search);
   }, [currentPage, search]);
 
-  const [uploading, setUploading] = useState(false);
 
   const uploadFile = async () => {
     if (!file) { setUploadMsg("Please select a file first."); return; }
@@ -227,7 +226,7 @@ function Upload() {
             <button className="btn btn-ghost btn-sm" onClick={exportExcel}>
               <FiDownload size={13} /> Excel
             </button>
-            <button 
+            <button
               className="btn btn-primary btn-sm"
               onClick={() => { setShowAddForm(!showAddForm); setEditId(null); }}
             >
@@ -236,208 +235,208 @@ function Upload() {
           </div>
         </div>
 
-      {uploading ? (
-        <Loader message="Uploading and processing Excel workbook..." />
-      ) : loading ? (
-        <Loader message="Loading uploaded data logs..." />
-      ) : (
-        <>
-          {/* Import Excel Section */}
-          <div className="card">
-            <div className="card-title">Import Excel File</div>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-            <label style={{
-              display: "inline-flex", alignItems: "center", gap: "8px",
-              padding: "9px 16px", background: "var(--bg-elevated)",
-              border: "1px solid var(--border)", borderRadius: "var(--radius-sm)",
-              color: "var(--text-secondary)", cursor: "pointer", fontSize: "13px",
-              transition: "all 0.15s"
-            }}>
-              <FiUpload size={14} />
-              {file ? file.name : "Choose Excel file (.xlsx)"}
-              <input
-                type="file"
-                accept=".xlsx,.xls"
-                style={{ display: "none" }}
-                onChange={(e) => { setFile(e.target.files[0]); setUploadMsg(""); }}
-              />
-            </label>
-
-            <button className="btn btn-primary" onClick={uploadFile} disabled={uploading}>
-              <FiUpload size={13} /> {uploading ? "Uploading Excel..." : "Upload"}
-            </button>
-
-            {uploadMsg && (
-              <span style={{
-                fontSize: "13px",
-                fontWeight: "500",
-                color: uploadMsg.startsWith("✅") ? "var(--success)" : "var(--danger)"
-              }}>
-                {uploadMsg}
-              </span>
-            )}
-          </div>
-
-          {uploading && (
-            <div className="alert" style={{ background: "rgba(59, 130, 246, 0.1)", border: "1px solid rgba(59, 130, 246, 0.3)", color: "var(--accent)", marginTop: "14px", marginBottom: "4px", display: "flex", alignItems: "center", gap: "10px", fontWeight: 600 }}>
-              <span>⏳ Processing and uploading Excel sheet records... Please wait, do not close the window.</span>
-            </div>
-          )}
-
-          <p style={{ marginTop: "10px", color: "var(--text-muted)", fontSize: "12px" }}>
-            Upload any Excel spreadsheet. Rows and columns will adapt dynamically.
-          </p>
-        </div>
-
-        {/* Manual Add Form */}
-        {showAddForm && (
-          <div className="card">
-            <div className="card-title">Add Row Manually</div>
-            <div className="form-grid">
-              {columns.map((col) => (
-                <div className="form-group" key={col}>
-                  <label className="form-label">{formatHeader(col)}</label>
+        {uploading ? (
+          <Loader message="Uploading and processing Excel workbook..." />
+        ) : loading ? (
+          <Loader message="Loading uploaded data logs..." />
+        ) : (
+          <>
+            {/* Import Excel Section */}
+            <div className="card">
+              <div className="card-title">Import Excel File</div>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                <label style={{
+                  display: "inline-flex", alignItems: "center", gap: "8px",
+                  padding: "9px 16px", background: "var(--bg-elevated)",
+                  border: "1px solid var(--border)", borderRadius: "var(--radius-sm)",
+                  color: "var(--text-secondary)", cursor: "pointer", fontSize: "13px",
+                  transition: "all 0.15s"
+                }}>
+                  <FiUpload size={14} />
+                  {file ? file.name : "Choose Excel file (.xlsx)"}
                   <input
-                    className="form-input"
-                    placeholder={`Enter ${col.replace(/_/g, " ")}`}
-                    value={newRowData[col] || ""}
-                    onChange={(e) => setNewRowData({ ...newRowData, [col]: e.target.value })}
+                    type="file"
+                    accept=".xlsx,.xls"
+                    style={{ display: "none" }}
+                    onChange={(e) => { setFile(e.target.files[0]); setUploadMsg(""); }}
                   />
-                </div>
-              ))}
-            </div>
-            <div style={{ marginTop: "12px" }}>
-              <button className="btn btn-success btn-sm" onClick={createManualRow}>
-                <FiCheck size={13} /> Save Record
-              </button>
-            </div>
-          </div>
-        )}
+                </label>
 
-        {/* Edit Form */}
-        {editId && (
-          <div className="card">
-            <div className="card-title">Edit Record — ID #{editId}</div>
-            <div className="form-grid">
-              {columns.map((col) => (
-                <div className="form-group" key={col}>
-                  <label className="form-label">{formatHeader(col)}</label>
-                  <input
-                    className="form-input"
-                    value={editRowData[col] || ""}
-                    onChange={(e) => setEditRowData({ ...editRowData, [col]: e.target.value })}
-                  />
-                </div>
-              ))}
-            </div>
-            <div style={{ display: "flex", gap: "10px", marginTop: "12px" }}>
-              <button className="btn btn-primary btn-sm" onClick={updateData}>
-                <FiCheck size={13} /> Save Changes
-              </button>
-              <button className="btn btn-ghost btn-sm" onClick={() => setEditId(null)}>
-                <FiX size={13} /> Cancel
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Dynamic Data Table */}
-        <div className="card">
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
-            <span style={{ fontWeight: 600, color: "var(--text-primary)", fontSize: "14px" }}>
-              Records ({totalRows})
-            </span>
-            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-              {selectedIds.length > 0 && (
-                <button className="btn btn-danger btn-sm" onClick={deleteSelected}>
-                  <FiTrash2 size={13} /> Delete Selected ({selectedIds.length})
+                <button className="btn btn-primary" onClick={uploadFile} disabled={uploading}>
+                  <FiUpload size={13} /> {uploading ? "Uploading Excel..." : "Upload"}
                 </button>
-              )}
-              <div className="search-bar">
-                <FiSearch size={14} />
-                <input
-                  placeholder="Search keywords..."
-                  value={search}
-                  onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
-                />
-              </div>
-            </div>
-          </div>
 
-          <div style={{ overflowX: "auto" }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th style={{ width: "40px" }}>
-                    <input
-                      type="checkbox"
-                      checked={isAllSelected}
-                      onChange={toggleSelectAll}
-                      style={{ cursor: "pointer" }}
-                    />
-                  </th>
-                  <th>#</th>
+                {uploadMsg && (
+                  <span style={{
+                    fontSize: "13px",
+                    fontWeight: "500",
+                    color: uploadMsg.startsWith("✅") ? "var(--success)" : "var(--danger)"
+                  }}>
+                    {uploadMsg}
+                  </span>
+                )}
+              </div>
+
+              {uploading && (
+                <div className="alert" style={{ background: "rgba(59, 130, 246, 0.1)", border: "1px solid rgba(59, 130, 246, 0.3)", color: "var(--accent)", marginTop: "14px", marginBottom: "4px", display: "flex", alignItems: "center", gap: "10px", fontWeight: 600 }}>
+                  <span>⏳ Processing and uploading Excel sheet records... Please wait, do not close the window.</span>
+                </div>
+              )}
+
+              <p style={{ marginTop: "10px", color: "var(--text-muted)", fontSize: "12px" }}>
+                Upload any Excel spreadsheet. Rows and columns will adapt dynamically.
+              </p>
+            </div>
+
+            {/* Manual Add Form */}
+            {showAddForm && (
+              <div className="card">
+                <div className="card-title">Add Row Manually</div>
+                <div className="form-grid">
                   {columns.map((col) => (
-                    <th key={col}>{col.replace(/_/g, " ").toUpperCase()}</th>
+                    <div className="form-group" key={col}>
+                      <label className="form-label">{formatHeader(col)}</label>
+                      <input
+                        className="form-input"
+                        placeholder={`Enter ${col.replace(/_/g, " ")}`}
+                        value={newRowData[col] || ""}
+                        onChange={(e) => setNewRowData({ ...newRowData, [col]: e.target.value })}
+                      />
+                    </div>
                   ))}
-                </tr>
-              </thead>
-              <tbody>
-                {paginated.length === 0 ? (
-                  <tr>
-                    <td colSpan={columns.length + 2}>
-                      <div className="empty-state">No records found.</div>
-                    </td>
-                  </tr>
-                ) : (
-                  paginated.map((item, index) => (
-                    <tr key={item.id} style={{ background: selectedIds.includes(item.id) ? "var(--bg-elevated)" : "transparent" }}>
-                      <td>
+                </div>
+                <div style={{ marginTop: "12px" }}>
+                  <button className="btn btn-success btn-sm" onClick={createManualRow}>
+                    <FiCheck size={13} /> Save Record
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Edit Form */}
+            {editId && (
+              <div className="card">
+                <div className="card-title">Edit Record — ID #{editId}</div>
+                <div className="form-grid">
+                  {columns.map((col) => (
+                    <div className="form-group" key={col}>
+                      <label className="form-label">{formatHeader(col)}</label>
+                      <input
+                        className="form-input"
+                        value={editRowData[col] || ""}
+                        onChange={(e) => setEditRowData({ ...editRowData, [col]: e.target.value })}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: "flex", gap: "10px", marginTop: "12px" }}>
+                  <button className="btn btn-primary btn-sm" onClick={updateData}>
+                    <FiCheck size={13} /> Save Changes
+                  </button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setEditId(null)}>
+                    <FiX size={13} /> Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Dynamic Data Table */}
+            <div className="card">
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
+                <span style={{ fontWeight: 600, color: "var(--text-primary)", fontSize: "14px" }}>
+                  Records ({totalRows})
+                </span>
+                <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                  {selectedIds.length > 0 && (
+                    <button className="btn btn-danger btn-sm" onClick={deleteSelected}>
+                      <FiTrash2 size={13} /> Delete Selected ({selectedIds.length})
+                    </button>
+                  )}
+                  <div className="search-bar">
+                    <FiSearch size={14} />
+                    <input
+                      placeholder="Search keywords..."
+                      value={search}
+                      onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ overflowX: "auto" }}>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: "40px" }}>
                         <input
                           type="checkbox"
-                          checked={selectedIds.includes(item.id)}
-                          onChange={() => toggleSelectRow(item.id)}
+                          checked={isAllSelected}
+                          onChange={toggleSelectAll}
                           style={{ cursor: "pointer" }}
                         />
-                      </td>
-                      <td style={{ color: "var(--text-muted)" }}>{((currentPage - 1) * pageSize) + index + 1}</td>
+                      </th>
+                      <th>#</th>
                       {columns.map((col) => (
-                        <td key={col}>
-                          {item.row_data && (item.row_data[col] !== null && item.row_data[col] !== undefined)
-                            ? String(item.row_data[col])
-                            : "—"}
-                        </td>
+                        <th key={col}>{col.replace(/_/g, " ").toUpperCase()}</th>
                       ))}
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "16px", flexWrap: "wrap", gap: "10px" }}>
-              <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
-                Showing {((currentPage - 1) * pageSize) + 1} - {Math.min(currentPage * pageSize, totalRows)} of {totalRows} entries
-              </span>
-              <div style={{ display: "flex", gap: "4px" }}>
-                <button className="btn btn-ghost btn-sm" onClick={() => setCurrentPage(p => Math.max(p - 1, 1))} disabled={currentPage === 1}>
-                  Prev
-                </button>
-                <span style={{ fontSize: "12px", fontWeight: "600", padding: "6px 12px", color: "var(--text-primary)" }}>
-                  Page {currentPage} of {totalPages}
-                </span>
-                <button className="btn btn-ghost btn-sm" onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages}>
-                  Next
-                </button>
+                  </thead>
+                  <tbody>
+                    {paginated.length === 0 ? (
+                      <tr>
+                        <td colSpan={columns.length + 2}>
+                          <div className="empty-state">No records found.</div>
+                        </td>
+                      </tr>
+                    ) : (
+                      paginated.map((item, index) => (
+                        <tr key={item.id} style={{ background: selectedIds.includes(item.id) ? "var(--bg-elevated)" : "transparent" }}>
+                          <td>
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.includes(item.id)}
+                              onChange={() => toggleSelectRow(item.id)}
+                              style={{ cursor: "pointer" }}
+                            />
+                          </td>
+                          <td style={{ color: "var(--text-muted)" }}>{((currentPage - 1) * pageSize) + index + 1}</td>
+                          {columns.map((col) => (
+                            <td key={col}>
+                              {item.row_data && (item.row_data[col] !== null && item.row_data[col] !== undefined)
+                                ? String(item.row_data[col])
+                                : "—"}
+                            </td>
+                          ))}
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
-            </div>
-          )}
-        </div>
 
-        </>
-      )}
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "16px", flexWrap: "wrap", gap: "10px" }}>
+                  <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                    Showing {((currentPage - 1) * pageSize) + 1} - {Math.min(currentPage * pageSize, totalRows)} of {totalRows} entries
+                  </span>
+                  <div style={{ display: "flex", gap: "4px" }}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setCurrentPage(p => Math.max(p - 1, 1))} disabled={currentPage === 1}>
+                      Prev
+                    </button>
+                    <span style={{ fontSize: "12px", fontWeight: "600", padding: "6px 12px", color: "var(--text-primary)" }}>
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages}>
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+          </>
+        )}
 
       </div>
     </div>

@@ -188,8 +188,6 @@ function Kits() {
     }
   };
 
-  const [uploading, setUploading] = useState(false);
-
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -205,10 +203,6 @@ function Kits() {
     }
 
     setUploading(true);
-<<<<<<< HEAD
-
-=======
->>>>>>> develop
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
