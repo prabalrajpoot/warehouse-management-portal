@@ -422,30 +422,6 @@ function Navbar() {
             )}
           </div>
 
-          {/* Upload — admin + superadmin only */}
-          {isAdminOrSuper && (
-            <Link to="/upload" style={linkStyle("/upload")}>
-              <FiUpload size={16} />
-              Upload
-            </Link>
-          )}
-
-          {/* Upload Dashboard — admin + superadmin only */}
-          {isAdminOrSuper && (
-            <Link to="/upload-dashboard" style={linkStyle("/upload-dashboard")}>
-              <FiBarChart2 size={16} />
-              Upload Dashboard
-            </Link>
-          )}
-
-          {/* Warehouses — admin + superadmin only */}
-          {isAdminOrSuper && (
-            <Link to="/warehouses" style={linkStyle("/warehouses")}>
-              <FiMapPin size={16} />
-              Warehouses
-            </Link>
-          )}
-
           {/* Kits Made — all roles */}
           <Link to="/kits" style={linkStyle("/kits")}>
             <FiBox size={16} />
@@ -472,6 +448,12 @@ function Navbar() {
             </Link>
           )}
 
+          {/* Man Power — all roles */}
+          <Link to="/man-power" style={linkStyle("/man-power")}>
+            <FiUserCheck size={16} />
+            Man Power
+          </Link>
+
           {/* Sample Inspection — admin + superadmin only */}
           {isAdminOrSuper && (
             <Link to="/sample-inspection" style={linkStyle("/sample-inspection")}>
@@ -480,11 +462,29 @@ function Navbar() {
             </Link>
           )}
 
-          {/* Man Power — all roles */}
-          <Link to="/man-power" style={linkStyle("/man-power")}>
-            <FiUserCheck size={16} />
-            Man Power
-          </Link>
+          {/* Warehouses — admin + superadmin only */}
+          {isAdminOrSuper && (
+            <Link to="/warehouses" style={linkStyle("/warehouses")}>
+              <FiMapPin size={16} />
+              Warehouses
+            </Link>
+          )}
+
+          {/* Upload — admin + superadmin only */}
+          {isAdminOrSuper && (
+            <Link to="/upload" style={linkStyle("/upload")}>
+              <FiUpload size={16} />
+              Upload
+            </Link>
+          )}
+
+          {/* Upload Dashboard — admin + superadmin only */}
+          {isAdminOrSuper && (
+            <Link to="/upload-dashboard" style={linkStyle("/upload-dashboard")}>
+              <FiBarChart2 size={16} />
+              Upload Dashboard
+            </Link>
+          )}
 
           {/* Activity Logs — admin + superadmin only */}
           {isAdminOrSuper && (

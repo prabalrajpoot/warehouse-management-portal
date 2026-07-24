@@ -399,7 +399,7 @@ function Dashboard() {
 
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-        
+
         {/* Trade Wise Month Wise Offering (Pie Chart + Month Summary) */}
         {selectedOfferingMonth && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "24px" }}>
@@ -776,7 +776,7 @@ function Dashboard() {
 
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-        
+
         {/* Value Summary Cards Grid */}
         <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "20px" }}>
           <div className="glass-card interactive-stat-card" style={{ padding: "20px 22px", borderRadius: "var(--radius-lg)" }}>
@@ -813,16 +813,16 @@ function Dashboard() {
               <AreaChart data={cumulativeData}>
                 <defs>
                   <linearGradient id="colorAccent" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.35}/>
-                    <stop offset="95%" stopColor="var(--accent)" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.35} />
+                    <stop offset="95%" stopColor="var(--accent)" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="colorSuccess" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--success)" stopOpacity={0.35}/>
-                    <stop offset="95%" stopColor="var(--success)" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="var(--success)" stopOpacity={0.35} />
+                    <stop offset="95%" stopColor="var(--success)" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="colorWarning" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--warning)" stopOpacity={0.35}/>
-                    <stop offset="95%" stopColor="var(--warning)" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="var(--warning)" stopOpacity={0.35} />
+                    <stop offset="95%" stopColor="var(--warning)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
@@ -1182,6 +1182,13 @@ function Dashboard() {
                       <div className="stat-label">{s.label}</div>
                       <div className="stat-value" style={{ color: s.color }}>{s.value}</div>
                     </div>
+                    {(s.label === "Kit Made" || s.label === "Kits Made" || s.label === "Total Kits Made") && (
+                      <div style={{ fontSize: "10.5px", color: "var(--text-secondary)", marginTop: "8px", borderTop: "1px solid var(--border)", paddingTop: "6px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "4px", whiteSpace: "nowrap" }}>
+                        <span style={{ color: "var(--accent)", fontWeight: 600 }}>🔹PTL: {data.kits_ptl || 0}</span>
+                        <span style={{ color: "var(--success)", fontWeight: 600 }}>🔹VTL: {data.kits_vtl || 0}</span>
+                        <span style={{ color: "var(--warning)", fontWeight: 600 }}>🔹ITI: {data.kits_iti || 0}</span>
+                      </div>
+                    )}
                     {s.label === "Inspected Qty" && (
                       <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "8px", borderTop: "1px solid var(--border)", paddingTop: "6px", display: "flex", flexWrap: "wrap", gap: "10px" }}>
                         <span style={{ color: "var(--success)", fontWeight: 600 }}>✔ Pass: {data.inspected_passed}</span>

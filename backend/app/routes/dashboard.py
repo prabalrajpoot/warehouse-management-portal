@@ -110,6 +110,9 @@ def dashboard(
 
     # 1. KPI Quantities stats
     total_kits = sum(k.quantity for k in kits)
+    kits_ptl = sum(k.quantity for k in kits if k.firm and k.firm.strip().upper() == "PTL")
+    kits_vtl = sum(k.quantity for k in kits if k.firm and k.firm.strip().upper() == "VTL")
+    kits_iti = sum(k.quantity for k in kits if k.firm and k.firm.strip().upper() == "ITI")
     total_dispatched = sum(d.quantity for d in dispatches)
     total_inspected = sum(i.quantity for i in inspections)
 
@@ -339,6 +342,9 @@ def dashboard(
 
     res = {
         "total_kits": total_kits,
+        "kits_ptl": kits_ptl,
+        "kits_vtl": kits_vtl,
+        "kits_iti": kits_iti,
         "total_dispatched": total_dispatched,
         "total_inspected": total_inspected,
         "inspected_passed": inspected_passed,
