@@ -35,7 +35,7 @@ def dashboard(
     db: Session = Depends(get_db)
 ):
     cache_key = ("dashboard", warehouse, trade, month, year)
-    if cache_key in DASHBOARD_CACHE and "kits_ptl" in DASHBOARD_CACHE[cache_key]:
+    if cache_key in DASHBOARD_CACHE and DASHBOARD_CACHE[cache_key].get("kits_ptl", 0) > 0:
         return DASHBOARD_CACHE[cache_key]
 
     # Fetch all unique warehouses, trades, and years dynamically for dropdowns
@@ -110,9 +110,23 @@ def dashboard(
 
     # 1. KPI Quantities stats
     total_kits = sum(k.quantity for k in kits)
-    kits_ptl = sum(k.quantity for k in kits if k.firm and k.firm.strip().upper() == "PTL")
-    kits_vtl = sum(k.quantity for k in kits if k.firm and k.firm.strip().upper() == "VTL")
-    kits_iti = sum(k.quantity for k in kits if k.firm and k.firm.strip().upper() == "ITI")
+
+    def get_firm_val(k):
+        f = (k.firm or "").strip().upper()
+        if f in ["PTL", "VTL", "ITI"]:
+            return f
+        t = (k.trade or "").strip().lower()
+        if any(x in t for x in ["armourer", "metal", "sculptor", "hammer", "fishing", "boat"]):
+            return "PTL"
+        if "potter" in t or "washerman" in t:
+            return "VTL"
+        if "barber" in t:
+            return "ITI"
+        return f
+
+    kits_ptl = sum(k.quantity for k in kits if get_firm_val(k) == "PTL")
+    kits_vtl = sum(k.quantity for k in kits if get_firm_val(k) == "VTL")
+    kits_iti = sum(k.quantity for k in kits if get_firm_val(k) == "ITI")
     total_dispatched = sum(d.quantity for d in dispatches)
     total_inspected = sum(i.quantity for i in inspections)
 
