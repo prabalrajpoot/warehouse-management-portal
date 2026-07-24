@@ -247,6 +247,8 @@ function SampleInspection() {
     XLSX.writeFile(wb, activeTab === "factory" ? "factory_sample_report.xlsx" : "sample_approved_report.xlsx");
   };
 
+  const [uploading, setUploading] = useState(false);
+
   const handleFileUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -261,6 +263,7 @@ function SampleInspection() {
       }
     }
 
+    setUploading(true);
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
@@ -272,6 +275,7 @@ function SampleInspection() {
 
         if (!data || data.length === 0) {
           alert("The uploaded Excel file appears to be empty.");
+          setUploading(false);
           return;
         }
 
@@ -301,12 +305,13 @@ function SampleInspection() {
             successCount++;
           }
         }
-        alert(`Successfully imported ${successCount} sample inspection record(s).`);
+        alert(`✅ Successfully imported ${successCount} sample inspection record(s)!`);
         fetchRecords();
       } catch (err) {
         console.error(err);
         alert("Failed to process Excel file.");
       } finally {
+        setUploading(false);
         e.target.value = "";
       }
     };
@@ -391,21 +396,29 @@ function SampleInspection() {
                   style={{ display: "none" }}
                   accept=".xlsx, .xls, .csv"
                   onChange={handleFileUpload}
+                  disabled={uploading}
                 />
                 <button
                   className="btn btn-ghost btn-sm"
                   onClick={() => document.getElementById("sample-excel-input").click()}
+                  disabled={uploading}
                   style={{ display: "flex", gap: "6px", alignItems: "center" }}
                 >
-                  <FiUpload size={14} /> Upload Excel
+                  <FiUpload size={14} /> {uploading ? "Uploading Excel..." : "Upload Excel"}
                 </button>
-                <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setEditId(null); setMsg(""); }}>
+                <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setEditId(null); setMsg(""); }} disabled={uploading}>
                   <FiPlus size={14} /> {showForm ? "Cancel" : "Add Sample Log"}
                 </button>
               </>
             )}
           </div>
         </div>
+
+        {uploading && (
+          <div className="alert" style={{ background: "rgba(59, 130, 246, 0.1)", border: "1px solid rgba(59, 130, 246, 0.3)", color: "var(--accent)", marginBottom: "16px", display: "flex", alignItems: "center", gap: "10px", fontWeight: 600 }}>
+            <span>⏳ Processing and uploading Excel sheet records... Please wait, do not close the window.</span>
+          </div>
+        )}
 
         {/* Tabs */}
         <div style={{ display: "flex", gap: "6px", marginBottom: "20px", background: "var(--bg-surface)", padding: "6px", borderRadius: "8px", border: "1px solid var(--border)", width: "fit-content" }}>

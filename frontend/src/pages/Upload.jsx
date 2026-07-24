@@ -49,8 +49,11 @@ function Upload() {
     fetchData(currentPage, search);
   }, [currentPage, search]);
 
+  const [uploading, setUploading] = useState(false);
+
   const uploadFile = async () => {
     if (!file) { setUploadMsg("Please select a file first."); return; }
+    setUploading(true);
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -62,6 +65,8 @@ function Upload() {
     } catch (error) {
       const errMsg = error.response?.data?.detail || "Upload failed. Check file format.";
       setUploadMsg(`❌ ${errMsg}`);
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -245,8 +250,8 @@ function Upload() {
               />
             </label>
 
-            <button className="btn btn-primary" onClick={uploadFile}>
-              <FiUpload size={13} /> Upload
+            <button className="btn btn-primary" onClick={uploadFile} disabled={uploading}>
+              <FiUpload size={13} /> {uploading ? "Uploading Excel..." : "Upload"}
             </button>
 
             {uploadMsg && (
@@ -259,6 +264,12 @@ function Upload() {
               </span>
             )}
           </div>
+
+          {uploading && (
+            <div className="alert" style={{ background: "rgba(59, 130, 246, 0.1)", border: "1px solid rgba(59, 130, 246, 0.3)", color: "var(--accent)", marginTop: "14px", marginBottom: "4px", display: "flex", alignItems: "center", gap: "10px", fontWeight: 600 }}>
+              <span>⏳ Processing and uploading Excel sheet records... Please wait, do not close the window.</span>
+            </div>
+          )}
 
           <p style={{ marginTop: "10px", color: "var(--text-muted)", fontSize: "12px" }}>
             Upload any Excel spreadsheet. Rows and columns will adapt dynamically.

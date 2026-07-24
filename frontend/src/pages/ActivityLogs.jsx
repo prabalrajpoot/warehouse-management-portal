@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
 import api from "../api/api";
-import { FiSearch, FiX, FiActivity, FiEye } from "react-icons/fi";
-import { isReadOnly } from "../utils/auth";
+import { FiSearch, FiX, FiActivity, FiEye, FiTrash2, FiCheck } from "react-icons/fi";
+import { isReadOnly, canDelete } from "../utils/auth";
 
 function ActivityLogs() {
   const [logs, setLogs] = useState([]);
@@ -15,8 +15,10 @@ function ActivityLogs() {
   const [filterAction, setFilterAction] = useState("");
   const [filterSearch, setFilterSearch] = useState("");
 
-  // Pagination
+  // Pagination & Selection states
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const pageSize = 50;
 
   const fetchLogs = async () => {
@@ -34,6 +36,42 @@ function ActivityLogs() {
   useEffect(() => {
     fetchLogs();
   }, []);
+
+  const deleteLog = async (id) => {
+    try {
+      await api.delete(`/activity-logs/${id}`);
+      setDeleteConfirmId(null);
+      setSelectedIds(selectedIds.filter(x => x !== id));
+      fetchLogs();
+    } catch {
+      alert("Failed to delete activity log.");
+    }
+  };
+
+  const deleteSelected = async () => {
+    if (selectedIds.length === 0) return;
+    if (!window.confirm(`Are you sure you want to delete ${selectedIds.length} selected activity log(s)?`)) return;
+    try {
+      await api.post("/activity-logs/delete-bulk", { ids: selectedIds });
+      setSelectedIds([]);
+      setCurrentPage(1);
+      fetchLogs();
+    } catch {
+      alert("Failed to delete selected activity logs.");
+    }
+  };
+
+  const clearAllLogs = async () => {
+    if (!window.confirm("⚠️ Danger: Are you sure you want to CLEAR ALL audit activity logs? This action cannot be undone.")) return;
+    try {
+      await api.delete("/activity-logs/clear-all");
+      setSelectedIds([]);
+      setLogs([]);
+      alert("✅ All activity logs have been cleared!");
+    } catch {
+      alert("Failed to clear activity logs.");
+    }
+  };
 
   // Helpers to get unique filter options
   const uniqueUsers = [...new Set(logs.map(l => l.username).filter(Boolean))].sort();
@@ -67,6 +105,24 @@ function ActivityLogs() {
   };
 
   const hasActiveFilters = filterUser || filterRole || filterModule || filterAction || filterSearch;
+
+  // Master Checkbox Logic
+  const isAllSelected = filtered.length > 0 && selectedIds.length === filtered.length;
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filtered.map(l => l.id));
+    }
+  };
+
+  const toggleSelectRow = (id) => {
+    if (selectedIds.includes(id)) {
+      setSelectedIds(selectedIds.filter(x => x !== id));
+    } else {
+      setSelectedIds([...selectedIds, id]);
+    }
+  };
 
   // Pagination Logic
   const totalPages = Math.ceil(filtered.length / pageSize) || 1;
@@ -128,6 +184,18 @@ function ActivityLogs() {
             </h1>
             <p className="page-subtitle">Track and audit additions, edits, deletions, and uploads across the system</p>
           </div>
+          {canDelete() && (
+            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+              {selectedIds.length > 0 && (
+                <button className="btn btn-danger btn-sm" onClick={deleteSelected}>
+                  <FiTrash2 size={13} /> Delete Selected ({selectedIds.length})
+                </button>
+              )}
+              <button className="btn btn-outline btn-sm" onClick={clearAllLogs} style={{ color: "var(--danger)", borderColor: "var(--danger)" }}>
+                <FiTrash2 size={13} /> Clear All Logs
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Filter bar */}
@@ -187,6 +255,16 @@ function ActivityLogs() {
                 <table className="data-table">
                   <thead>
                     <tr>
+                      {canDelete() && (
+                        <th style={{ width: "40px" }}>
+                          <input
+                            type="checkbox"
+                            checked={isAllSelected}
+                            onChange={toggleSelectAll}
+                            style={{ cursor: "pointer" }}
+                          />
+                        </th>
+                      )}
                       <th style={{ width: "50px" }}>#</th>
                       <th style={{ width: "160px" }}>Timestamp</th>
                       <th>User Email</th>
@@ -194,18 +272,29 @@ function ActivityLogs() {
                       <th style={{ width: "120px" }}>Module</th>
                       <th style={{ width: "120px" }}>Action</th>
                       <th>Details</th>
+                      {canDelete() && <th>Action</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {paginated.length === 0 ? (
                       <tr>
-                        <td colSpan={7}>
+                        <td colSpan={canDelete() ? 9 : 7}>
                           <div className="empty-state">No audit logs found matching selected criteria.</div>
                         </td>
                       </tr>
                     ) : (
                       paginated.map((log, index) => (
-                        <tr key={log.id}>
+                        <tr key={log.id} style={{ background: selectedIds.includes(log.id) ? "var(--bg-elevated)" : "transparent" }}>
+                          {canDelete() && (
+                            <td>
+                              <input
+                                type="checkbox"
+                                checked={selectedIds.includes(log.id)}
+                                onChange={() => toggleSelectRow(log.id)}
+                                style={{ cursor: "pointer" }}
+                              />
+                            </td>
+                          )}
                           <td style={{ color: "var(--text-muted)", fontSize: "11px" }}>
                             {((currentPage - 1) * pageSize) + index + 1}
                           </td>
@@ -231,6 +320,30 @@ function ActivityLogs() {
                           <td style={{ color: "var(--text-secondary)", fontSize: "12px" }}>
                             {log.details}
                           </td>
+                          {canDelete() && (
+                            <td>
+                              {deleteConfirmId === log.id ? (
+                                <span style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "12px", color: "var(--danger)" }}>
+                                  Sure?
+                                  <button className="btn-icon" style={{ color: "var(--danger)" }} onClick={() => deleteLog(log.id)}>
+                                    <FiCheck size={13} />
+                                  </button>
+                                  <button className="btn-icon" onClick={() => setDeleteConfirmId(log.id)}>
+                                    <FiX size={13} />
+                                  </button>
+                                </span>
+                              ) : (
+                                <button
+                                  className="btn-icon"
+                                  title="Delete Log Entry"
+                                  style={{ color: "var(--danger)" }}
+                                  onClick={() => setDeleteConfirmId(log.id)}
+                                >
+                                  <FiTrash2 size={13} />
+                                </button>
+                              )}
+                            </td>
+                          )}
                         </tr>
                       ))
                     )}

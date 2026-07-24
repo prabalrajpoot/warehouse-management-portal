@@ -176,7 +176,9 @@ function Kits() {
     }
   };
 
-  const handleFileUpload = async (e) => {
+  const [uploading, setUploading] = useState(false);
+
+  const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
@@ -190,6 +192,7 @@ function Kits() {
       }
     }
 
+    setUploading(true);
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
@@ -266,22 +269,28 @@ function Kits() {
 
         if (parsedRows.length === 0) {
           alert("Could not parse any valid rows. Please check that Date, Warehouse, and Trade columns exist.");
+          setUploading(false);
           return;
         }
 
         const confirmImport = window.confirm(`Found ${parsedRows.length} valid rows. Import them now?`);
-        if (!confirmImport) return;
+        if (!confirmImport) {
+          setUploading(false);
+          return;
+        }
 
         await api.post("/kits/bulk", parsedRows);
-        alert(`Successfully imported ${parsedRows.length} historical kit records!`);
+        alert(`✅ Successfully imported ${parsedRows.length} kit record(s)!`);
         fetchKits();
       } catch (err) {
         console.error(err);
         alert("An error occurred while parsing the file. Please ensure it is a valid Excel or CSV sheet.");
+      } finally {
+        setUploading(false);
+        e.target.value = "";
       }
     };
     reader.readAsBinaryString(file);
-    e.target.value = "";
   };
 
   const createKit = async () => {
@@ -547,21 +556,29 @@ function Kits() {
                   style={{ display: "none" }}
                   accept=".xlsx, .xls, .csv"
                   onChange={handleFileUpload}
+                  disabled={uploading}
                 />
                 <button
                   className="btn btn-ghost btn-sm"
                   onClick={() => document.getElementById("kits-file-input").click()}
+                  disabled={uploading}
                   style={{ display: "flex", gap: "6px", alignItems: "center" }}
                 >
-                  <FiUpload size={14} /> Upload Excel
+                  <FiUpload size={14} /> {uploading ? "Uploading Excel..." : "Upload Excel"}
                 </button>
-                <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setEditId(null); setMsg(""); }}>
+                <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setEditId(null); setMsg(""); }} disabled={uploading}>
                   <FiPlus size={14} /> {showForm ? "Cancel" : "Add Kit Entry"}
                 </button>
               </>
             )}
           </div>
         </div>
+
+        {uploading && (
+          <div className="alert" style={{ background: "rgba(59, 130, 246, 0.1)", border: "1px solid rgba(59, 130, 246, 0.3)", color: "var(--accent)", marginBottom: "16px", display: "flex", alignItems: "center", gap: "10px", fontWeight: 600 }}>
+            <span>⏳ Processing and uploading Excel sheet records... Please wait, do not close the window.</span>
+          </div>
+        )}
 
         {/* Add Entry Card */}
         {showForm && !isReadOnly() && (
