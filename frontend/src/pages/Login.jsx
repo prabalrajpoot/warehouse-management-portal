@@ -43,20 +43,11 @@ function Login() {
         {/* Left Side: Branding & Info */}
         <div className="login-left-panel">
           <div>
-            <div style={{
-              background: "#ffffff",
-              padding: "10px 16px",
-              borderRadius: "14px",
-              display: "inline-flex",
-              alignItems: "center",
-              marginBottom: "24px",
-              boxShadow: "0 4px 16px rgba(0, 0, 0, 0.12)",
-              border: "1px solid rgba(255, 255, 255, 0.3)"
-            }}>
+            <div style={{ marginBottom: "24px", display: "inline-flex", alignItems: "center" }}>
               <img
-                src="/logo.png"
+                src="/logo_white.png"
                 alt="Pragyawan Technologies Limited"
-                style={{ height: "42px", objectFit: "contain" }}
+                style={{ height: "48px", objectFit: "contain", filter: "drop-shadow(0 2px 8px rgba(0, 0, 0, 0.2))" }}
               />
             </div>
 
