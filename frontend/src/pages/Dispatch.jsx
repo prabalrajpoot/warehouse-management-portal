@@ -462,6 +462,12 @@ function DispatchLog() {
         )}
       </div>
 
+      {uploading && (
+        <div className="alert" style={{ background: "rgba(59, 130, 246, 0.1)", border: "1px solid rgba(59, 130, 246, 0.3)", color: "var(--accent)", marginBottom: "16px", display: "flex", alignItems: "center", gap: "10px", fontWeight: 600 }}>
+          <span>⏳ Processing and uploading Excel sheet records... Please wait, do not close the window.</span>
+        </div>
+      )}
+
       {showForm && !isReadOnly() && (
         <div className="card">
           <div className="card-title">New Dispatch Record</div>
@@ -1206,6 +1212,122 @@ function ReturnLog() {
     XLSX.writeFile(wb, "returns_report.xlsx");
   };
 
+  const [uploading, setUploading] = useState(false);
+
+  const uploadExcelFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (isWarehouseManager()) {
+      const proceed = window.confirm(
+        "⚠️ Attention: Please ensure that all entries in your Excel file are valid and correct before uploading. As a Warehouse Manager, you will not have permission to delete entries once they are imported. Do you want to proceed with the upload?"
+      );
+      if (!proceed) {
+        e.target.value = "";
+        return;
+      }
+    }
+
+    setUploading(true);
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target.result;
+        const wb = XLSX.read(bstr, { type: "binary" });
+        const wsName = wb.SheetNames[0];
+        const ws = wb.Sheets[wsName];
+        const rows = XLSX.utils.sheet_to_json(ws);
+
+        if (!rows || rows.length === 0) {
+          alert("The uploaded Excel file appears to be empty.");
+          setUploading(false);
+          return;
+        }
+
+        const findKey = (obj, aliases) => {
+          const keys = Object.keys(obj);
+          for (const alias of aliases) {
+            const match = keys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g, "") === alias.toLowerCase().replace(/[^a-z0-9]/g, ""));
+            if (match) return match;
+          }
+          return null;
+        };
+
+        const parsedRows = rows.map(row => {
+          const dateKey = findKey(row, ["returndate", "dispatcheddate", "date", "dispatched_date", "return_date"]);
+          let dateVal = "";
+          if (dateKey) {
+            let rawDate = row[dateKey];
+            if (typeof rawDate === "number") {
+              const dateObj = XLSX.SSF.parse_date_code(rawDate);
+              const dd = String(dateObj.d).padStart(2, '0');
+              const mm = String(dateObj.m).padStart(2, '0');
+              const yyyy = dateObj.y;
+              dateVal = `${dd}/${mm}/${yyyy}`;
+            } else {
+              const s = String(rawDate).trim();
+              if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+                const parts = s.split("-");
+                dateVal = `${parts[2]}/${parts[1]}/${parts[0]}`;
+              } else if (/^\d{2}-\d{2}-\d{4}$/.test(s)) {
+                dateVal = s.replace(/-/g, "/");
+              } else if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) {
+                dateVal = s;
+              } else {
+                dateVal = s;
+              }
+            }
+          }
+
+          const whKey = findKey(row, ["warehousename", "warehouse", "location", "warehouse_name"]);
+          const whVal = whKey ? String(row[whKey]).trim() : "";
+
+          const tradeKey = findKey(row, ["trade", "tradename", "trade_name"]);
+          const tradeVal = tradeKey ? String(row[tradeKey]).trim() : "";
+
+          const firmKey = findKey(row, ["firm", "company", "firm_name"]);
+          const firmVal = firmKey ? String(row[firmKey]).trim() : "";
+
+          const setTypeKey = findKey(row, ["settype", "set_type", "type"]);
+          const setTypeVal = setTypeKey ? String(row[setTypeKey]).trim() : "";
+
+          const qtyKey = findKey(row, ["quantity", "qty", "count"]);
+          const qtyVal = qtyKey ? Number(row[qtyKey]) : 1;
+
+          const msKey = findKey(row, ["msbarcode", "barcode", "ms_barcode", "msno"]);
+          const msVal = msKey ? String(row[msKey]).trim() : "";
+
+          return {
+            dispatched_date: dateVal,
+            firm: firmVal || null,
+            warehouse_name: whVal || null,
+            trade: tradeVal || null,
+            set_type: setTypeVal || null,
+            quantity: isNaN(qtyVal) ? 1 : qtyVal,
+            ms_barcode: msVal || null
+          };
+        }).filter(r => r.dispatched_date);
+
+        if (parsedRows.length === 0) {
+          alert("Could not parse any valid return rows. Please check that 'Return Date' or 'Date' column exists.");
+          setUploading(false);
+          return;
+        }
+
+        await api.post("/dispatch-return/bulk", parsedRows);
+        alert(`✅ Successfully imported ${parsedRows.length} return record(s)!`);
+        fetchReturns();
+      } catch (err) {
+        console.error(err);
+        alert("Failed to process return Excel file.");
+      } finally {
+        setUploading(false);
+        e.target.value = "";
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
   return (
     <>
       {uploading ? (
@@ -1231,14 +1353,40 @@ function ReturnLog() {
         <button className="btn btn-ghost btn-sm" onClick={exportExcel}>
           <FiDownload size={13} /> Excel
         </button>
-        <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setEditId(null); setMsg(""); }}>
-          <FiPlus size={14} /> {showForm ? "Cancel" : "Add Return Entry"}
-        </button>
+        {!isReadOnly() && (
+          <>
+            <input
+              type="file"
+              id="return-excel-input"
+              style={{ display: "none" }}
+              accept=".xlsx, .xls, .csv"
+              onChange={uploadExcelFile}
+              disabled={uploading}
+            />
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => document.getElementById("return-excel-input").click()}
+              disabled={uploading}
+              style={{ display: "flex", gap: "6px", alignItems: "center" }}
+            >
+              <FiUpload size={14} /> {uploading ? "Uploading Excel..." : "Upload Excel"}
+            </button>
+            <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setEditId(null); setMsg(""); }} disabled={uploading}>
+              <FiPlus size={14} /> {showForm ? "Cancel" : "Add Return Entry"}
+            </button>
+          </>
+        )}
       </div>
 
+<<<<<<< HEAD
       {msg && (
         <div className={`alert ${msg.startsWith("❌") || msg.includes("Failed") ? "alert-error" : "alert-success"}`} style={{ marginBottom: "16px" }}>
           {msg}
+=======
+      {uploading && (
+        <div className="alert" style={{ background: "rgba(59, 130, 246, 0.1)", border: "1px solid rgba(59, 130, 246, 0.3)", color: "var(--accent)", marginBottom: "16px", display: "flex", alignItems: "center", gap: "10px", fontWeight: 600 }}>
+          <span>⏳ Processing and uploading Excel sheet records... Please wait, do not close the window.</span>
+>>>>>>> develop
         </div>
       )}
 

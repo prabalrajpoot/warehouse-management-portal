@@ -1207,38 +1207,6 @@ function Dashboard() {
                 ))}
               </div>
 
-              {/* Low Stock Alerts */}
-              {data.low_stock_items && data.low_stock_items.length > 0 && (
-                <div className="card" style={{ marginTop: "24px", borderColor: "rgba(239, 68, 68, 0.2)", background: "rgba(239, 68, 68, 0.02)" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--danger)", fontWeight: 700, fontSize: "13px", marginBottom: "12px" }}>
-                    ⚠️ Low Stock Alert (Items under 50 units)
-                  </div>
-                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                    {data.low_stock_items.map((item) => (
-                      <div
-                        key={item.item_name}
-                        style={{
-                          background: "var(--bg-surface)",
-                          border: "1px solid var(--border)",
-                          borderRadius: "6px",
-                          padding: "8px 12px",
-                          fontSize: "12px",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                          boxShadow: "0 1px 3px rgba(0,0,0,0.02)"
-                        }}
-                      >
-                        <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{item.item_name}</span>
-                        <span className="badge badge-red" style={{ fontWeight: "700", padding: "2px 6px" }}>
-                          {item.stock} left
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {/* Monthly Summary Chart (Full Width) */}
               <div className="glass-card" style={{ padding: "24px", borderRadius: "var(--radius-lg)", marginTop: "24px" }}>
                 <div className="card-title">Monthly Summary - Kits Made vs Inspected vs Dispatched</div>

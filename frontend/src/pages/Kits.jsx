@@ -188,7 +188,9 @@ function Kits() {
     }
   };
 
-  const handleFileUpload = async (e) => {
+  const [uploading, setUploading] = useState(false);
+
+  const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
@@ -203,7 +205,10 @@ function Kits() {
     }
 
     setUploading(true);
+<<<<<<< HEAD
 
+=======
+>>>>>>> develop
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
@@ -280,26 +285,34 @@ function Kits() {
 
         if (parsedRows.length === 0) {
           alert("Could not parse any valid rows. Please check that Date, Warehouse, and Trade columns exist.");
+          setUploading(false);
           return;
         }
 
+<<<<<<< HEAD
+=======
+        const confirmImport = window.confirm(`Found ${parsedRows.length} valid rows. Import them now?`);
+>>>>>>> develop
         if (!confirmImport) {
           setUploading(false);
           return;
         }
 
         await api.post("/kits/bulk", parsedRows);
-        alert(`Successfully imported ${parsedRows.length} historical kit records!`);
+        alert(`✅ Successfully imported ${parsedRows.length} kit record(s)!`);
         fetchKits();
       } catch (err) {
         console.error(err);
         alert("An error occurred while parsing the file. Please ensure it is a valid Excel or CSV sheet.");
       } finally {
         setUploading(false);
+<<<<<<< HEAD
+=======
+        e.target.value = "";
+>>>>>>> develop
       }
     };
     reader.readAsBinaryString(file);
-    e.target.value = "";
   };
 
   const createKit = async () => {
@@ -565,15 +578,17 @@ function Kits() {
                   style={{ display: "none" }}
                   accept=".xlsx, .xls, .csv"
                   onChange={handleFileUpload}
+                  disabled={uploading}
                 />
                 <button
                   className="btn btn-ghost btn-sm"
                   onClick={() => document.getElementById("kits-file-input").click()}
+                  disabled={uploading}
                   style={{ display: "flex", gap: "6px", alignItems: "center" }}
                 >
-                  <FiUpload size={14} /> Upload Excel
+                  <FiUpload size={14} /> {uploading ? "Uploading Excel..." : "Upload Excel"}
                 </button>
-                <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setEditId(null); setMsg(""); }}>
+                <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setEditId(null); setMsg(""); }} disabled={uploading}>
                   <FiPlus size={14} /> {showForm ? "Cancel" : "Add Kit Entry"}
                 </button>
               </>
@@ -581,6 +596,7 @@ function Kits() {
           </div>
         </div>
 
+<<<<<<< HEAD
         {uploading ? (
           <Loader message="Uploading and parsing kit records from Excel..." />
         ) : loading ? (
@@ -606,6 +622,46 @@ function Kits() {
                       <option value="">— Select Firm —</option>
                       {FIRM_OPTIONS.map(f => (
                         <option key={f} value={f}>{f}</option>
+=======
+        {uploading && (
+          <div className="alert" style={{ background: "rgba(59, 130, 246, 0.1)", border: "1px solid rgba(59, 130, 246, 0.3)", color: "var(--accent)", marginBottom: "16px", display: "flex", alignItems: "center", gap: "10px", fontWeight: 600 }}>
+            <span>⏳ Processing and uploading Excel sheet records... Please wait, do not close the window.</span>
+          </div>
+        )}
+
+        {/* Add Entry Card */}
+        {showForm && !isReadOnly() && (
+          <div className="card">
+            <div className="card-title">New Kits Made Record</div>
+            <div className="form-grid">
+              <div className="form-group">
+                <label className="form-label">Date</label>
+                <input className="form-input" type="date" value={callDate} onChange={(e) => setCallDate(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Firm</label>
+                <select className="form-select" value={firm} onChange={(e) => {
+                  setFirm(e.target.value);
+                  setTrade("");
+                  setSetType("");
+                }}>
+                  <option value="">— Select Firm —</option>
+                  {FIRM_OPTIONS.map(f => (
+                    <option key={f} value={f}>{f}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Warehouse Name</label>
+                <select className="form-select" value={warehouseName} onChange={(e) => setWarehouseName(e.target.value)} disabled={isWarehouseManager()}>
+                  {isWarehouseManager() ? (
+                    <option value={getWarehouseName()}>{getWarehouseName()}</option>
+                  ) : (
+                    <>
+                      <option value="">— Select Warehouse —</option>
+                      {warehouses.map(w => (
+                        <option key={w.id} value={w.name}>{w.name}</option>
+>>>>>>> develop
                       ))}
                     </select>
                   </div>

@@ -60,6 +60,46 @@ def create_inward(
     }
 
 
+@router.post("/inventory-inward/bulk")
+def create_inward_bulk(
+    payload: list[InwardCreate],
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    try:
+        new_entries = [
+            InventoryInward(
+                received_date=item.received_date,
+                received_qty=item.received_qty,
+                invoice_date=item.invoice_date,
+                invoice_no=item.invoice_no,
+                invoice_qty=item.invoice_qty,
+                short_damage_qty=item.short_damage_qty,
+                item_name=item.item_name,
+                brand_description=item.brand_description,
+                trade_name=item.trade_name,
+                firm_name=item.firm_name
+            )
+            for item in payload
+        ]
+        db.bulk_save_objects(new_entries)
+        db.commit()
+
+        log_activity(
+            db=db,
+            username=current_user.get("sub", "Unknown"),
+            role=current_user.get("role", "worker"),
+            action="ADD (Bulk)",
+            module="Inventory Inward",
+            details=f"Bulk imported {len(payload)} Inward Inventory entries"
+        )
+
+        return {"message": f"Successfully imported {len(payload)} inward entries"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.get("/inventory-inward")
 def get_inward(
     db: Session = Depends(get_db)

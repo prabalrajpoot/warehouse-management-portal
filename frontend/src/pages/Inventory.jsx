@@ -28,6 +28,33 @@ const toYMD = (dateStr) => {
   return dateStr;
 };
 
+const parseExcelDate = (val) => {
+  if (val === null || val === undefined || val === "") return "";
+  if (typeof val === "number") {
+    try {
+      const dateObj = XLSX.SSF.parse_date_code(val);
+      if (dateObj) {
+        const dd = String(dateObj.d).padStart(2, "0");
+        const mm = String(dateObj.m).padStart(2, "0");
+        const yyyy = dateObj.y;
+        return `${dd}/${mm}/${yyyy}`;
+      }
+    } catch {
+      // Fallback
+    }
+  }
+  const s = String(val).trim();
+  if (!s) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const [y, m, d] = s.split("-");
+    return `${d}/${m}/${y}`;
+  }
+  if (/^\d{2}[-/]\d{2}[-/]\d{4}$/.test(s)) {
+    return s.replace(/-/g, "/");
+  }
+  return toDMY(s);
+};
+
 const FIRM_OPTIONS = ["ITI", "PTL", "VTL"];
 
 const FIRM_TRADE_MAP = {
@@ -70,6 +97,7 @@ function InwardSection() {
   const [entries, setEntries] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [msg, setMsg] = useState("");
+  const [uploading, setUploading] = useState(false);
 
   // Column filters
   const [filterDate, setFilterDate] = useState("");
@@ -101,8 +129,33 @@ function InwardSection() {
     catch (e) { console.log(e); }
   };
 
-  const handleChange = (key, val) => setForm((f) => ({ ...f, [key]: val }));
-  const handleEditChange = (key, val) => setEditForm((f) => ({ ...f, [key]: val }));
+  const handleChange = (key, val) => {
+    setForm((f) => {
+      const next = { ...f, [key]: val };
+      if (key === "received_qty" || key === "invoice_qty") {
+        const rQty = next.received_qty !== "" && next.received_qty !== null ? Number(next.received_qty) : null;
+        const iQty = next.invoice_qty !== "" && next.invoice_qty !== null ? Number(next.invoice_qty) : null;
+        if (rQty !== null && iQty !== null) {
+          next.short_damage_qty = rQty - iQty;
+        }
+      }
+      return next;
+    });
+  };
+
+  const handleEditChange = (key, val) => {
+    setEditForm((f) => {
+      const next = { ...f, [key]: val };
+      if (key === "received_qty" || key === "invoice_qty") {
+        const rQty = next.received_qty !== "" && next.received_qty !== null ? Number(next.received_qty) : null;
+        const iQty = next.invoice_qty !== "" && next.invoice_qty !== null ? Number(next.invoice_qty) : null;
+        if (rQty !== null && iQty !== null) {
+          next.short_damage_qty = rQty - iQty;
+        }
+      }
+      return next;
+    });
+  };
 
   const createEntry = async () => {
     if (!form.received_date) { setMsg("Received Date is required."); return; }
@@ -210,6 +263,7 @@ function InwardSection() {
       }
     }
 
+    setUploading(true);
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
@@ -221,44 +275,75 @@ function InwardSection() {
 
         if (!data || data.length === 0) {
           alert("The uploaded Excel file appears to be empty.");
+          setUploading(false);
           return;
         }
 
-        let successCount = 0;
+        const findKey = (row, aliases) => {
+          const keys = Object.keys(row);
+          for (const alias of aliases) {
+            const match = keys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g, "") === alias.toLowerCase().replace(/[^a-z0-9]/g, ""));
+            if (match) return match;
+          }
+          return null;
+        };
+
+        const parsedRows = [];
         for (const row of data) {
-          const recDate = row["Received Date"] || row["received_date"] || "";
-          const recQty = row["Received Qty"] || row["received_qty"] || null;
-          const invDate = row["Invoice Date"] || row["invoice_date"] || null;
-          const invNo = row["Invoice No"] || row["Invoice No."] || row["invoice_no"] || null;
-          const invQty = row["Invoice Qty"] || row["invoice_qty"] || null;
-          const damageQty = row["Short/Damage Qty"] || row["short_damage_qty"] || null;
-          const item = row["Item Name"] || row["item_name"] || null;
-          const brand = row["Brand/Description"] || row["brand_description"] || null;
-          const trade = row["Trade Name"] || row["Trade Category"] || row["trade_name"] || null;
-          const firm = row["Firm Name"] || row["Firm"] || row["firm_name"] || null;
+          const recDateKey = findKey(row, ["receiveddate", "recdate", "date", "received_date", "inwarddate"]);
+          const recQtyKey = findKey(row, ["receivedqty", "receivedquantity", "recqty", "received_qty", "qty"]);
+          const invDateKey = findKey(row, ["invoicedate", "invdate", "invoice_date"]);
+          const invNoKey = findKey(row, ["invoiceno", "invoicenumber", "invno", "invoice_no"]);
+          const invQtyKey = findKey(row, ["invoiceqty", "invoicequantity", "invqty", "invoice_qty"]);
+          const damageKey = findKey(row, ["shortdamageqty", "shortqty", "damageqty", "short_damage_qty", "shortdamage"]);
+          const itemKey = findKey(row, ["itemname", "item", "item_name"]);
+          const brandKey = findKey(row, ["branddescription", "brand", "description", "brand_description"]);
+          const tradeKey = findKey(row, ["tradename", "trade", "tradecategory", "trade_name"]);
+          const firmKey = findKey(row, ["firmname", "firm", "company", "firm_name"]);
+
+          const recDate = parseExcelDate(recDateKey ? row[recDateKey] : "");
+          const invDate = parseExcelDate(invDateKey ? row[invDateKey] : "");
+          const recQty = (recQtyKey && row[recQtyKey] !== undefined && row[recQtyKey] !== "") ? Number(row[recQtyKey]) : null;
+          const invQty = (invQtyKey && row[invQtyKey] !== undefined && row[invQtyKey] !== "") ? Number(row[invQtyKey]) : null;
+
+          // Short/Damage Formula: Received Qty - Invoice Qty
+          let shortDamageQty = null;
+          if (recQty !== null && invQty !== null) {
+            shortDamageQty = recQty - invQty;
+          } else if (damageKey && row[damageKey] !== undefined && row[damageKey] !== "") {
+            shortDamageQty = Number(row[damageKey]);
+          }
 
           if (recDate) {
-            await api.post("/inventory-inward", {
-              received_date: toDMY(String(recDate)),
-              received_qty: recQty ? Number(recQty) : null,
-              invoice_date: invDate ? toDMY(String(invDate)) : null,
-              invoice_no: invNo ? String(invNo) : null,
-              invoice_qty: invQty ? Number(invQty) : null,
-              short_damage_qty: damageQty ? Number(damageQty) : null,
-              item_name: item ? String(item) : null,
-              brand_description: brand ? String(brand) : null,
-              trade_name: trade ? String(trade) : null,
-              firm_name: firm ? String(firm) : null
+            parsedRows.push({
+              received_date: recDate,
+              received_qty: recQty,
+              invoice_date: invDate || null,
+              invoice_no: invNoKey ? String(row[invNoKey]).trim() : null,
+              invoice_qty: invQty,
+              short_damage_qty: shortDamageQty,
+              item_name: itemKey ? String(row[itemKey]).trim() : null,
+              brand_description: brandKey ? String(row[brandKey]).trim() : null,
+              trade_name: tradeKey ? String(row[tradeKey]).trim() : null,
+              firm_name: firmKey ? String(row[firmKey]).trim() : null
             });
-            successCount++;
           }
         }
-        alert(`Successfully imported ${successCount} inward stock record(s).`);
+
+        if (parsedRows.length === 0) {
+          alert("Could not parse any valid inward entries. Please ensure that 'Received Date' column exists.");
+          setUploading(false);
+          return;
+        }
+
+        await api.post("/inventory-inward/bulk", parsedRows);
+        alert(`✅ Successfully imported ${parsedRows.length} inward stock record(s)!`);
         fetchEntries();
       } catch (err) {
         console.error(err);
         alert("Failed to process inward Excel file.");
       } finally {
+        setUploading(false);
         e.target.value = "";
       }
     };
@@ -386,20 +471,28 @@ function InwardSection() {
               style={{ display: "none" }}
               accept=".xlsx, .xls, .csv"
               onChange={handleInwardFileUpload}
+              disabled={uploading}
             />
             <button
               className="btn btn-ghost btn-sm"
               onClick={() => document.getElementById("inward-excel-input").click()}
+              disabled={uploading}
               style={{ display: "flex", gap: "6px", alignItems: "center" }}
             >
-              <FiUpload size={14} /> Upload Excel
+              <FiUpload size={14} /> {uploading ? "Uploading Excel..." : "Upload Excel"}
             </button>
-            <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setEditId(null); setMsg(""); }}>
+            <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setEditId(null); setMsg(""); }} disabled={uploading}>
               <FiPlus size={14} /> {showForm ? "Cancel" : "Add Inward Entry"}
             </button>
           </>
         )}
       </div>
+
+      {uploading && (
+        <div className="alert" style={{ background: "rgba(59, 130, 246, 0.1)", border: "1px solid rgba(59, 130, 246, 0.3)", color: "var(--accent)", marginBottom: "16px", display: "flex", alignItems: "center", gap: "10px", fontWeight: 600 }}>
+          <span>⏳ Processing and uploading Excel sheet records... Please wait, do not close the window.</span>
+        </div>
+      )}
 
       {showForm && !isReadOnly() && (
         <div className="card">
@@ -588,8 +681,12 @@ function InwardSection() {
                     <td><code>{item.invoice_no || "—"}</code></td>
                     <td>{item.invoice_qty ?? "—"}</td>
                     <td>
-                      {item.short_damage_qty ? (
-                        <span className="badge badge-red">{item.short_damage_qty}</span>
+                      {item.short_damage_qty !== null && item.short_damage_qty !== undefined ? (
+                        item.short_damage_qty === 0 ? (
+                          <span className="badge badge-green" style={{ fontWeight: 600 }}>0</span>
+                        ) : (
+                          <span className="badge badge-red">{item.short_damage_qty}</span>
+                        )
                       ) : "—"}
                     </td>
                     <td>{item.item_name || <span style={{ color: "var(--text-muted)", fontStyle: "italic" }}>—</span>}</td>
@@ -669,6 +766,7 @@ function OutwardSection() {
   const [entries, setEntries] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [msg, setMsg] = useState("");
+  const [uploading, setUploading] = useState(false);
 
   // Column filters
   const [filterDate, setFilterDate] = useState("");
@@ -728,8 +826,9 @@ function OutwardSection() {
     setEditForm({
       transfer_date: toYMD(item.transfer_date) || "", invoice_no: item.invoice_no || "",
       item_name: item.item_name || "", brand: item.brand || "",
-      trade_name: item.trade_name || "", firm_name: item.firm_name || "", qty: item.qty ?? "",
-      warehouse_from: item.warehouse_from || "", warehouse_to: item.warehouse_to || ""
+      trade_name: item.trade_name || "", firm_name: item.firm_name || "",
+      qty: item.qty ?? "", warehouse_from: item.warehouse_from || "",
+      warehouse_to: item.warehouse_to || ""
     });
     setShowForm(false); setDeleteConfirmId(null);
     setTimeout(() => {
@@ -808,6 +907,7 @@ function OutwardSection() {
       }
     }
 
+    setUploading(true);
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
@@ -819,37 +919,57 @@ function OutwardSection() {
 
         if (!data || data.length === 0) {
           alert("The uploaded Excel file appears to be empty.");
+          setUploading(false);
           return;
         }
 
-        let successCount = 0;
+        const findKey = (row, aliases) => {
+          const keys = Object.keys(row);
+          for (const alias of aliases) {
+            const match = keys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g, "") === alias.toLowerCase().replace(/[^a-z0-9]/g, ""));
+            if (match) return match;
+          }
+          return null;
+        };
+
+        const parsedRows = [];
         for (const row of data) {
-          const transDate = row["Transfer Date"] || row["transfer_date"] || "";
-          const invNo = row["Invoice No"] || row["Invoice No."] || row["invoice_no"] || null;
-          const item = row["Item Name"] || row["item_name"] || null;
-          const brand = row["Brand"] || row["brand"] || null;
-          const trade = row["Trade Name"] || row["Trade Category"] || row["trade_name"] || null;
-          const qty = row["Qty"] || row["qty"] || null;
-          const whFrom = row["Warehouse From"] || row["warehouse_from"] || null;
-          const whTo = row["Warehouse To"] || row["warehouse_to"] || null;
-          const firm = row["Firm Name"] || row["Firm"] || row["firm_name"] || null;
+          const transDateKey = findKey(row, ["transferdate", "transdate", "date", "transfer_date", "outwarddate"]);
+          const invNoKey = findKey(row, ["invoiceno", "invoicenumber", "invno", "invoice_no"]);
+          const itemKey = findKey(row, ["itemname", "item", "item_name"]);
+          const brandKey = findKey(row, ["brand", "description", "brand_description"]);
+          const tradeKey = findKey(row, ["tradename", "trade", "tradecategory", "trade_name"]);
+          const qtyKey = findKey(row, ["qty", "quantity", "outwardqty", "transferqty"]);
+          const whFromKey = findKey(row, ["warehousefrom", "fromwarehouse", "warehouse_from", "from"]);
+          const whToKey = findKey(row, ["warehouseto", "towarehouse", "warehouse_to", "to"]);
+          const firmKey = findKey(row, ["firmname", "firm", "company", "firm_name"]);
+
+          const transDate = parseExcelDate(transDateKey ? row[transDateKey] : "");
+          const qty = (qtyKey && row[qtyKey] !== undefined && row[qtyKey] !== "") ? Number(row[qtyKey]) : null;
 
           if (transDate) {
-            await api.post("/inventory-outward", {
-              transfer_date: toDMY(String(transDate)),
-              invoice_no: invNo ? String(invNo) : null,
-              item_name: item ? String(item) : null,
-              brand: brand ? String(brand) : null,
-              trade_name: trade ? String(trade) : null,
-              qty: qty ? Number(qty) : null,
-              warehouse_from: whFrom ? String(whFrom) : null,
-              warehouse_to: whTo ? String(whTo) : null,
-              firm_name: firm ? String(firm) : null
+            parsedRows.push({
+              transfer_date: transDate,
+              invoice_no: invNoKey ? String(row[invNoKey]).trim() : null,
+              item_name: itemKey ? String(row[itemKey]).trim() : null,
+              brand: brandKey ? String(row[brandKey]).trim() : null,
+              trade_name: tradeKey ? String(row[tradeKey]).trim() : null,
+              qty: qty,
+              warehouse_from: whFromKey ? String(row[whFromKey]).trim() : null,
+              warehouse_to: whToKey ? String(row[whToKey]).trim() : null,
+              firm_name: firmKey ? String(row[firmKey]).trim() : null
             });
-            successCount++;
           }
         }
-        alert(`Successfully imported ${successCount} outward stock record(s).`);
+
+        if (parsedRows.length === 0) {
+          alert("Could not parse any valid outward entries. Please ensure that 'Transfer Date' column exists.");
+          setUploading(false);
+          return;
+        }
+
+        await api.post("/inventory-outward/bulk", parsedRows);
+        alert(`✅ Successfully imported ${parsedRows.length} outward stock record(s)!`);
         fetchEntries();
       } catch (err) {
         console.error(err);
@@ -983,20 +1103,28 @@ function OutwardSection() {
               style={{ display: "none" }}
               accept=".xlsx, .xls, .csv"
               onChange={handleOutwardFileUpload}
+              disabled={uploading}
             />
             <button
               className="btn btn-ghost btn-sm"
               onClick={() => document.getElementById("outward-excel-input").click()}
+              disabled={uploading}
               style={{ display: "flex", gap: "6px", alignItems: "center" }}
             >
-              <FiUpload size={14} /> Upload Excel
+              <FiUpload size={14} /> {uploading ? "Uploading Excel..." : "Upload Excel"}
             </button>
-            <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setEditId(null); setMsg(""); }}>
+            <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setEditId(null); setMsg(""); }} disabled={uploading}>
               <FiPlus size={14} /> {showForm ? "Cancel" : "Add Outward Entry"}
             </button>
           </>
         )}
       </div>
+
+      {uploading && (
+        <div className="alert" style={{ background: "rgba(59, 130, 246, 0.1)", border: "1px solid rgba(59, 130, 246, 0.3)", color: "var(--accent)", marginBottom: "16px", display: "flex", alignItems: "center", gap: "10px", fontWeight: 600 }}>
+          <span>⏳ Processing and uploading Excel sheet records... Please wait, do not close the window.</span>
+        </div>
+      )}
 
       {showForm && !isReadOnly() && (
         <div className="card">

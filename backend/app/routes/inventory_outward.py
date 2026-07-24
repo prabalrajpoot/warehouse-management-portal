@@ -58,6 +58,45 @@ def create_outward(
     }
 
 
+@router.post("/inventory-outward/bulk")
+def create_outward_bulk(
+    payload: list[OutwardCreate],
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    try:
+        new_entries = [
+            InventoryOutward(
+                transfer_date=item.transfer_date,
+                invoice_no=item.invoice_no,
+                item_name=item.item_name,
+                brand=item.brand,
+                trade_name=item.trade_name,
+                qty=item.qty,
+                warehouse_from=item.warehouse_from,
+                warehouse_to=item.warehouse_to,
+                firm_name=item.firm_name
+            )
+            for item in payload
+        ]
+        db.bulk_save_objects(new_entries)
+        db.commit()
+
+        log_activity(
+            db=db,
+            username=current_user.get("sub", "Unknown"),
+            role=current_user.get("role", "worker"),
+            action="ADD (Bulk)",
+            module="Inventory Outward",
+            details=f"Bulk imported {len(payload)} Outward Inventory entries"
+        )
+
+        return {"message": f"Successfully imported {len(payload)} outward entries"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.get("/inventory-outward")
 def get_outward(
     db: Session = Depends(get_db)
