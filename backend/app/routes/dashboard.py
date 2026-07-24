@@ -35,7 +35,7 @@ def dashboard(
     db: Session = Depends(get_db)
 ):
     cache_key = ("dashboard", warehouse, trade, month, year)
-    if cache_key in DASHBOARD_CACHE:
+    if cache_key in DASHBOARD_CACHE and "kits_ptl" in DASHBOARD_CACHE[cache_key]:
         return DASHBOARD_CACHE[cache_key]
 
     # Fetch all unique warehouses, trades, and years dynamically for dropdowns
