@@ -113,14 +113,18 @@ def dashboard(
 
     def get_firm_val(k):
         f = (k.firm or "").strip().upper()
-        if f in ["PTL", "VTL", "ITI"]:
-            return f
+        if "PTL" in f:
+            return "PTL"
+        if "VTL" in f:
+            return "VTL"
+        if "ITI" in f:
+            return "ITI"
         t = (k.trade or "").strip().lower()
         if any(x in t for x in ["armourer", "metal", "sculptor", "hammer", "fishing", "boat"]):
             return "PTL"
-        if "potter" in t or "washerman" in t:
+        if any(x in t for x in ["potter", "washerman"]):
             return "VTL"
-        if "barber" in t:
+        if any(x in t for x in ["barber", "naai"]):
             return "ITI"
         return f
 
