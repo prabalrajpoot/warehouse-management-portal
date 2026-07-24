@@ -623,19 +623,6 @@ function Kits() {
                       {warehouses.map(w => (
                         <option key={w.id} value={w.name}>{w.name}</option>
                       ))}
-                    </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Warehouse Name</label>
-                <select className="form-select" value={warehouseName} onChange={(e) => setWarehouseName(e.target.value)} disabled={isWarehouseManager()}>
-                  {isWarehouseManager() ? (
-                    <option value={getWarehouseName()}>{getWarehouseName()}</option>
-                  ) : (
-                    <>
-                      <option value="">— Select Warehouse —</option>
-                      {warehouses.map(w => (
-                        <option key={w.id} value={w.name}>{w.name}</option>
-                      ))}
                     </>
                   )}
                 </select>
@@ -960,11 +947,8 @@ function Kits() {
             </div>
           )}
         </div>
-      </>
-        )}
-
+      </div>
     </div>
-    </div >
   );
 }
 
