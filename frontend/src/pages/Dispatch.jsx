@@ -197,7 +197,7 @@ function DispatchLog() {
         packaging_status: editPackagingStatus
       });
       const updatedId = editId;
-      setEditId(null); 
+      setEditId(null);
       fetchDispatches();
       setTimeout(() => {
         const row = document.getElementById(`dispatch-row-${updatedId}`);
@@ -236,9 +236,9 @@ function DispatchLog() {
         quantity: item.quantity,
         ms_barcode: item.ms_barcode
       });
-      
+
       // 2. Do NOT delete from dispatch as per request - keep in both tables
-      
+
       // 3. Refresh lists
       fetchDispatches();
       alert("✅ Dispatch successfully copied to Return Logs!");
@@ -437,420 +437,419 @@ function DispatchLog() {
       ) : (
         <>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginBottom: "16px", alignItems: "center" }}>
-        <button className="btn btn-ghost btn-sm" onClick={exportPDF}>
-          <FiDownload size={13} /> PDF
-        </button>
-        <button className="btn btn-ghost btn-sm" onClick={exportExcel}>
-          <FiDownload size={13} /> Excel
-        </button>
-        {!isReadOnly() && (
-          <>
-            <label className="btn btn-ghost btn-sm" style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: "4px" }}>
-              <FiUpload size={13} /> {uploading ? "Uploading..." : "Upload"}
-              <input
-                type="file"
-                accept=".xlsx,.xls"
-                style={{ display: "none" }}
-                onChange={uploadExcelFile}
-                disabled={uploading}
-              />
-            </label>
-            <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setEditId(null); setMsg(""); }}>
-              <FiPlus size={14} /> {showForm ? "Cancel" : "Add Dispatch Record"}
+            <button className="btn btn-ghost btn-sm" onClick={exportPDF}>
+              <FiDownload size={13} /> PDF
             </button>
-          </>
-        )}
-      </div>
-
-      {uploading && (
-        <div className="alert" style={{ background: "rgba(59, 130, 246, 0.1)", border: "1px solid rgba(59, 130, 246, 0.3)", color: "var(--accent)", marginBottom: "16px", display: "flex", alignItems: "center", gap: "10px", fontWeight: 600 }}>
-          <span>⏳ Processing and uploading Excel sheet records... Please wait, do not close the window.</span>
-        </div>
-      )}
-
-      {showForm && !isReadOnly() && (
-        <div className="card">
-          <div className="card-title">New Dispatch Record</div>
-          <div className="form-grid">
-            <div className="form-group">
-              <label className="form-label">Dispatched Date</label>
-              <input className="form-input" type="date" value={callDate} onChange={(e) => setCallDate(e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Firm</label>
-              <select className="form-select" value={firm} onChange={(e) => {
-                setFirm(e.target.value);
-                setTrade("");
-                setSetType("");
-              }}>
-                <option value="">— Select Firm —</option>
-                {FIRM_OPTIONS.map(f => (
-                  <option key={f} value={f}>{f}</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Warehouse Name</label>
-              <select className="form-select" value={warehouseName} onChange={(e) => setWarehouseName(e.target.value)} disabled={isWarehouseManager()}>
-                {isWarehouseManager() ? (
-                  <option value={getWarehouseName()}>{getWarehouseName()}</option>
-                ) : (
-                  <>
-                    <option value="">— Select Warehouse —</option>
-                    {warehouses.map(w => (
-                      <option key={w.id} value={w.name}>{w.name}</option>
-                    ))}
-                  </>
-                )}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Trade Category</label>
-              <select className="form-select" value={trade} onChange={(e) => {
-                const newTrade = e.target.value;
-                setTrade(newTrade);
-                const sets = getAvailableSetTypes(firm, newTrade);
-                if (sets.length === 1) {
-                  setSetType(sets[0]);
-                } else {
-                  setSetType("");
-                }
-              }} disabled={!firm}>
-                <option value="">{firm ? "— Select Trade —" : "— Select Firm First —"}</option>
-                {firm && FIRM_TRADE_MAP[firm]?.map(t => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Set Type</label>
-              <select className="form-select" value={setType} onChange={(e) => setSetType(e.target.value)} disabled={!firm || !trade}>
-                <option value="">{firm && trade ? "— Select Set Type —" : "— Select Trade First —"}</option>
-                {getAvailableSetTypes(firm, trade).map(s => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Dispatched Quantity</label>
-              <input className="form-input" type="number" placeholder="0" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">MS No. / Barcode</label>
-              <input className="form-input" placeholder="e.g. MS-00123" value={msBarcode} onChange={(e) => setMsBarcode(e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Packaging Status</label>
-              <select className="form-select" value={packagingStatus} onChange={(e) => setPackagingStatus(e.target.value)}>
-                <option value="Pending For Mark">Pending For Mark</option>
-                <option value="Already In Transit">Already In Transit</option>
-                <option value="Dispatched">Dispatched</option>
-              </select>
-            </div>
-          </div>
-          {msg && <div className="alert alert-error">{msg}</div>}
-          <button className="btn btn-primary btn-sm" onClick={createDispatch}>
-            <FiCheck size={13} /> Save Record
-          </button>
-        </div>
-      )}
-
-      {editId && (
-        <div id="dispatch-edit-form-container" className="card">
-          <div className="card-title">Edit Record — ID #{editId}</div>
-          <div className="form-grid">
-            <div className="form-group">
-              <label className="form-label">Dispatched Date</label>
-              <input className="form-input" type="date" value={editCallDate} onChange={(e) => setEditCallDate(e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Firm</label>
-              <select className="form-select" value={editFirm} onChange={(e) => {
-                setEditFirm(e.target.value);
-                setEditTrade("");
-                setEditSetType("");
-              }}>
-                <option value="">— Select Firm —</option>
-                {FIRM_OPTIONS.map(f => (
-                  <option key={f} value={f}>{f}</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Warehouse Name</label>
-              <select className="form-select" value={editWarehouseName} onChange={(e) => setEditWarehouseName(e.target.value)} disabled={isWarehouseManager()}>
-                {isWarehouseManager() ? (
-                  <option value={getWarehouseName()}>{getWarehouseName()}</option>
-                ) : (
-                  <>
-                    <option value="">— Select Warehouse —</option>
-                    {warehouses.map(w => (
-                      <option key={w.id} value={w.name}>{w.name}</option>
-                    ))}
-                  </>
-                )}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Trade Category</label>
-              <select className="form-select" value={editTrade} onChange={(e) => {
-                const newTrade = e.target.value;
-                setEditTrade(newTrade);
-                const sets = getAvailableSetTypes(editFirm, newTrade);
-                if (sets.length === 1) {
-                  setEditSetType(sets[0]);
-                } else {
-                  setEditSetType("");
-                }
-              }} disabled={!editFirm}>
-                <option value="">{editFirm ? "— Select Trade —" : "— Select Firm First —"}</option>
-                {editFirm && FIRM_TRADE_MAP[editFirm]?.map(t => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Set Type</label>
-              <select className="form-select" value={editSetType} onChange={(e) => setEditSetType(e.target.value)} disabled={!editFirm || !editTrade}>
-                <option value="">{editFirm && editTrade ? "— Select Set Type —" : "— Select Trade First —"}</option>
-                {getAvailableSetTypes(editFirm, editTrade).map(s => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Dispatched Quantity</label>
-              <input className="form-input" type="number" value={editQuantity} onChange={(e) => setEditQuantity(e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">MS No. / Barcode</label>
-              <input className="form-input" value={editMsBarcode} onChange={(e) => setEditMsBarcode(e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Packaging Status</label>
-              <select className="form-select" value={editPackagingStatus} onChange={(e) => setEditPackagingStatus(e.target.value)}>
-                <option value="Pending For Mark">Pending For Mark</option>
-                <option value="Already In Transit">Already In Transit</option>
-                <option value="Dispatched">Dispatched</option>
-              </select>
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: "10px", marginTop: "12px" }}>
-            <button className="btn btn-primary btn-sm" onClick={updateDispatch}><FiCheck size={13} /> Save Changes</button>
-            <button className="btn btn-ghost btn-sm" onClick={() => {
-              const prevId = editId;
-              setEditId(null);
-              setTimeout(() => {
-                const row = document.getElementById(`dispatch-row-${prevId}`);
-                if (row) {
-                  row.scrollIntoView({ behavior: "smooth", block: "center" });
-                }
-              }, 100);
-            }}><FiX size={13} /> Cancel</button>
-          </div>
-        </div>
-      )}
-
-      <div className="card">
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", flexWrap: "wrap", gap: "12px" }}>
-          <span style={{ fontWeight: 600, color: "var(--text-primary)", fontSize: "14px" }}>Dispatch Logs ({filtered.length})</span>
-          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-            {selectedIds.length > 0 && (
-              <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
-                <select 
-                  className="form-select" 
-                  style={{ height: "30px", fontSize: "12px", padding: "4px 8px", width: "160px", margin: 0 }}
-                  value={bulkStatus}
-                  onChange={(e) => setBulkStatus(e.target.value)}
-                >
-                  <option value="">-- Bulk Pkg Status --</option>
-                  <option value="Pending For Mark">Pending For Mark</option>
-                  <option value="Already In Transit">Already In Transit</option>
-                  <option value="Dispatched">Dispatched</option>
-                </select>
-                <button className="btn btn-primary btn-sm" onClick={updateBulkStatus}>
-                  Update Status ({selectedIds.length})
+            <button className="btn btn-ghost btn-sm" onClick={exportExcel}>
+              <FiDownload size={13} /> Excel
+            </button>
+            {!isReadOnly() && (
+              <>
+                <label className="btn btn-ghost btn-sm" style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: "4px" }}>
+                  <FiUpload size={13} /> {uploading ? "Uploading..." : "Upload"}
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls"
+                    style={{ display: "none" }}
+                    onChange={uploadExcelFile}
+                    disabled={uploading}
+                  />
+                </label>
+                <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setEditId(null); setMsg(""); }}>
+                  <FiPlus size={14} /> {showForm ? "Cancel" : "Add Dispatch Record"}
                 </button>
-                <button className="btn btn-outline btn-sm" onClick={markSelectedAsReturned} style={{ color: "var(--accent)", borderColor: "var(--accent)" }}>
-                  🔄 Return Selected ({selectedIds.length})
-                </button>
-                {canDelete() && (
-                  <button className="btn btn-danger btn-sm" onClick={deleteSelected}>
-                    <FiTrash2 size={13} /> Delete Selected ({selectedIds.length})
+              </>
+            )}
+          </div>
+
+          {uploading && (
+            <div className="alert" style={{ background: "rgba(59, 130, 246, 0.1)", border: "1px solid rgba(59, 130, 246, 0.3)", color: "var(--accent)", marginBottom: "16px", display: "flex", alignItems: "center", gap: "10px", fontWeight: 600 }}>
+              <span>⏳ Processing and uploading Excel sheet records... Please wait, do not close the window.</span>
+            </div>
+          )}
+
+          {showForm && !isReadOnly() && (
+            <div className="card">
+              <div className="card-title">New Dispatch Record</div>
+              <div className="form-grid">
+                <div className="form-group">
+                  <label className="form-label">Dispatched Date</label>
+                  <input className="form-input" type="date" value={callDate} onChange={(e) => setCallDate(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Firm</label>
+                  <select className="form-select" value={firm} onChange={(e) => {
+                    setFirm(e.target.value);
+                    setTrade("");
+                    setSetType("");
+                  }}>
+                    <option value="">— Select Firm —</option>
+                    {FIRM_OPTIONS.map(f => (
+                      <option key={f} value={f}>{f}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Warehouse Name</label>
+                  <select className="form-select" value={warehouseName} onChange={(e) => setWarehouseName(e.target.value)} disabled={isWarehouseManager()}>
+                    {isWarehouseManager() ? (
+                      <option value={getWarehouseName()}>{getWarehouseName()}</option>
+                    ) : (
+                      <>
+                        <option value="">— Select Warehouse —</option>
+                        {warehouses.map(w => (
+                          <option key={w.id} value={w.name}>{w.name}</option>
+                        ))}
+                      </>
+                    )}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Trade Category</label>
+                  <select className="form-select" value={trade} onChange={(e) => {
+                    const newTrade = e.target.value;
+                    setTrade(newTrade);
+                    const sets = getAvailableSetTypes(firm, newTrade);
+                    if (sets.length === 1) {
+                      setSetType(sets[0]);
+                    } else {
+                      setSetType("");
+                    }
+                  }} disabled={!firm}>
+                    <option value="">{firm ? "— Select Trade —" : "— Select Firm First —"}</option>
+                    {firm && FIRM_TRADE_MAP[firm]?.map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Set Type</label>
+                  <select className="form-select" value={setType} onChange={(e) => setSetType(e.target.value)} disabled={!firm || !trade}>
+                    <option value="">{firm && trade ? "— Select Set Type —" : "— Select Trade First —"}</option>
+                    {getAvailableSetTypes(firm, trade).map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Dispatched Quantity</label>
+                  <input className="form-input" type="number" placeholder="0" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">MS No. / Barcode</label>
+                  <input className="form-input" placeholder="e.g. MS-00123" value={msBarcode} onChange={(e) => setMsBarcode(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Packaging Status</label>
+                  <select className="form-select" value={packagingStatus} onChange={(e) => setPackagingStatus(e.target.value)}>
+                    <option value="Pending For Mark">Pending For Mark</option>
+                    <option value="Already In Transit">Already In Transit</option>
+                    <option value="Dispatched">Dispatched</option>
+                  </select>
+                </div>
+              </div>
+              {msg && <div className="alert alert-error">{msg}</div>}
+              <button className="btn btn-primary btn-sm" onClick={createDispatch}>
+                <FiCheck size={13} /> Save Record
+              </button>
+            </div>
+          )}
+
+          {editId && (
+            <div id="dispatch-edit-form-container" className="card">
+              <div className="card-title">Edit Record — ID #{editId}</div>
+              <div className="form-grid">
+                <div className="form-group">
+                  <label className="form-label">Dispatched Date</label>
+                  <input className="form-input" type="date" value={editCallDate} onChange={(e) => setEditCallDate(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Firm</label>
+                  <select className="form-select" value={editFirm} onChange={(e) => {
+                    setEditFirm(e.target.value);
+                    setEditTrade("");
+                    setEditSetType("");
+                  }}>
+                    <option value="">— Select Firm —</option>
+                    {FIRM_OPTIONS.map(f => (
+                      <option key={f} value={f}>{f}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Warehouse Name</label>
+                  <select className="form-select" value={editWarehouseName} onChange={(e) => setEditWarehouseName(e.target.value)} disabled={isWarehouseManager()}>
+                    {isWarehouseManager() ? (
+                      <option value={getWarehouseName()}>{getWarehouseName()}</option>
+                    ) : (
+                      <>
+                        <option value="">— Select Warehouse —</option>
+                        {warehouses.map(w => (
+                          <option key={w.id} value={w.name}>{w.name}</option>
+                        ))}
+                      </>
+                    )}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Trade Category</label>
+                  <select className="form-select" value={editTrade} onChange={(e) => {
+                    const newTrade = e.target.value;
+                    setEditTrade(newTrade);
+                    const sets = getAvailableSetTypes(editFirm, newTrade);
+                    if (sets.length === 1) {
+                      setEditSetType(sets[0]);
+                    } else {
+                      setEditSetType("");
+                    }
+                  }} disabled={!editFirm}>
+                    <option value="">{editFirm ? "— Select Trade —" : "— Select Firm First —"}</option>
+                    {editFirm && FIRM_TRADE_MAP[editFirm]?.map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Set Type</label>
+                  <select className="form-select" value={editSetType} onChange={(e) => setEditSetType(e.target.value)} disabled={!editFirm || !editTrade}>
+                    <option value="">{editFirm && editTrade ? "— Select Set Type —" : "— Select Trade First —"}</option>
+                    {getAvailableSetTypes(editFirm, editTrade).map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Dispatched Quantity</label>
+                  <input className="form-input" type="number" value={editQuantity} onChange={(e) => setEditQuantity(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">MS No. / Barcode</label>
+                  <input className="form-input" value={editMsBarcode} onChange={(e) => setEditMsBarcode(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Packaging Status</label>
+                  <select className="form-select" value={editPackagingStatus} onChange={(e) => setEditPackagingStatus(e.target.value)}>
+                    <option value="Pending For Mark">Pending For Mark</option>
+                    <option value="Already In Transit">Already In Transit</option>
+                    <option value="Dispatched">Dispatched</option>
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: "10px", marginTop: "12px" }}>
+                <button className="btn btn-primary btn-sm" onClick={updateDispatch}><FiCheck size={13} /> Save Changes</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => {
+                  const prevId = editId;
+                  setEditId(null);
+                  setTimeout(() => {
+                    const row = document.getElementById(`dispatch-row-${prevId}`);
+                    if (row) {
+                      row.scrollIntoView({ behavior: "smooth", block: "center" });
+                    }
+                  }, 100);
+                }}><FiX size={13} /> Cancel</button>
+              </div>
+            </div>
+          )}
+
+          <div className="card">
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", flexWrap: "wrap", gap: "12px" }}>
+              <span style={{ fontWeight: 600, color: "var(--text-primary)", fontSize: "14px" }}>Dispatch Logs ({filtered.length})</span>
+              <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                {selectedIds.length > 0 && (
+                  <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                    <select
+                      className="form-select"
+                      style={{ height: "30px", fontSize: "12px", padding: "4px 8px", width: "160px", margin: 0 }}
+                      value={bulkStatus}
+                      onChange={(e) => setBulkStatus(e.target.value)}
+                    >
+                      <option value="">-- Bulk Pkg Status --</option>
+                      <option value="Pending For Mark">Pending For Mark</option>
+                      <option value="Already In Transit">Already In Transit</option>
+                      <option value="Dispatched">Dispatched</option>
+                    </select>
+                    <button className="btn btn-primary btn-sm" onClick={updateBulkStatus}>
+                      Update Status ({selectedIds.length})
+                    </button>
+                    <button className="btn btn-outline btn-sm" onClick={markSelectedAsReturned} style={{ color: "var(--accent)", borderColor: "var(--accent)" }}>
+                      🔄 Return Selected ({selectedIds.length})
+                    </button>
+                    {canDelete() && (
+                      <button className="btn btn-danger btn-sm" onClick={deleteSelected}>
+                        <FiTrash2 size={13} /> Delete Selected ({selectedIds.length})
+                      </button>
+                    )}
+                  </div>
+                )}
+                {hasActiveFilters && (
+                  <button className="btn btn-ghost btn-sm" onClick={clearFilters} style={{ color: "var(--danger)", borderColor: "var(--danger)" }}>
+                    <FiX size={12} /> Clear Filters
                   </button>
                 )}
               </div>
-            )}
-            {hasActiveFilters && (
-              <button className="btn btn-ghost btn-sm" onClick={clearFilters} style={{ color: "var(--danger)", borderColor: "var(--danger)" }}>
-                <FiX size={12} /> Clear Filters
-              </button>
-            )}
-          </div>
-        </div>
+            </div>
 
-        {/* Filter Row */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "8px", marginBottom: "14px", padding: "12px", background: "var(--bg-elevated)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
-          <div>
-            <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Date</div>
-            <input className="form-input" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} type="text" placeholder="e.g. 01/01/2025" value={filterDate} onChange={e => { setFilterDate(e.target.value); setCurrentPage(1); }} />
-          </div>
-          <div>
-            <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Firm</div>
-            <select className="form-select" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} value={filterFirm} onChange={e => { setFilterFirm(e.target.value); setCurrentPage(1); }}>
-              <option value="">All</option>
-              {FIRM_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
-            </select>
-          </div>
-          <div>
-            <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Warehouse</div>
-            <select className="form-select" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} value={filterWarehouse} onChange={e => { setFilterWarehouse(e.target.value); setCurrentPage(1); }} disabled={isWarehouseManager()}>
-              {isWarehouseManager() ? (
-                <option value={getWarehouseName()}>{getWarehouseName()}</option>
-              ) : (
-                <>
+            {/* Filter Row */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "8px", marginBottom: "14px", padding: "12px", background: "var(--bg-elevated)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
+              <div>
+                <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Date</div>
+                <input className="form-input" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} type="text" placeholder="e.g. 01/01/2025" value={filterDate} onChange={e => { setFilterDate(e.target.value); setCurrentPage(1); }} />
+              </div>
+              <div>
+                <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Firm</div>
+                <select className="form-select" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} value={filterFirm} onChange={e => { setFilterFirm(e.target.value); setCurrentPage(1); }}>
                   <option value="">All</option>
-                  {uniqueWarehouses.map(w => <option key={w} value={w}>{w}</option>)}
-                </>
-              )}
-            </select>
-          </div>
-          <div>
-            <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Trade</div>
-            <select className="form-select" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} value={filterTrade} onChange={e => { setFilterTrade(e.target.value); setCurrentPage(1); }}>
-              <option value="">All</option>
-              {uniqueTrades.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </div>
-          <div>
-            <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Set Type</div>
-            <select className="form-select" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} value={filterSetType} onChange={e => { setFilterSetType(e.target.value); setCurrentPage(1); }}>
-              <option value="">All</option>
-              <option value="SET A">SET A</option>
-              <option value="SET B">SET B</option>
-            </select>
-          </div>
-          <div>
-            <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>MS No./Barcode</div>
-            <input className="form-input" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} type="text" placeholder="Search..." value={filterBarcode} onChange={e => { setFilterBarcode(e.target.value); setCurrentPage(1); }} />
-          </div>
-          <div>
-            <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Pkg Status</div>
-            <select className="form-select" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1); }}>
-              <option value="">All</option>
-              <option value="Dispatched">Dispatched</option>
-              <option value="Pending For Mark">Pending For Mark</option>
-              <option value="Already In Transit">Already In Transit</option>
-            </select>
-          </div>
-        </div>
-        <div style={{ overflowX: "auto" }}>
-          <table className="data-table">
-            <thead>
-              <tr>
-                {!isReadOnly() && (
-                  <th style={{ width: "40px" }}>
-                    <input
-                      type="checkbox"
-                      checked={isAllSelected}
-                      onChange={toggleSelectAll}
-                      style={{ cursor: "pointer" }}
-                    />
-                  </th>
-                )}
-                <th>#</th><th>Dispatched Date</th><th>Firm</th><th>Warehouse Name</th><th>Trade</th><th>Set Type</th><th>Dispatched Quantity</th><th>MS No./Barcode</th><th>Pkg Status</th>
-                {!isReadOnly() && <th>Actions</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {paginated.length === 0 ? (
-                <tr><td colSpan={11}><div className="empty-state">No dispatch logs found.</div></td></tr>
-              ) : (
-                paginated.map((item, i) => (
-                  <tr id={`dispatch-row-${item.id}`} key={item.id} style={{ background: selectedIds.includes(item.id) ? "var(--bg-elevated)" : "transparent" }}>
+                  {FIRM_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
+                </select>
+              </div>
+              <div>
+                <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Warehouse</div>
+                <select className="form-select" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} value={filterWarehouse} onChange={e => { setFilterWarehouse(e.target.value); setCurrentPage(1); }} disabled={isWarehouseManager()}>
+                  {isWarehouseManager() ? (
+                    <option value={getWarehouseName()}>{getWarehouseName()}</option>
+                  ) : (
+                    <>
+                      <option value="">All</option>
+                      {uniqueWarehouses.map(w => <option key={w} value={w}>{w}</option>)}
+                    </>
+                  )}
+                </select>
+              </div>
+              <div>
+                <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Trade</div>
+                <select className="form-select" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} value={filterTrade} onChange={e => { setFilterTrade(e.target.value); setCurrentPage(1); }}>
+                  <option value="">All</option>
+                  {uniqueTrades.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Set Type</div>
+                <select className="form-select" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} value={filterSetType} onChange={e => { setFilterSetType(e.target.value); setCurrentPage(1); }}>
+                  <option value="">All</option>
+                  <option value="SET A">SET A</option>
+                  <option value="SET B">SET B</option>
+                </select>
+              </div>
+              <div>
+                <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>MS No./Barcode</div>
+                <input className="form-input" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} type="text" placeholder="Search..." value={filterBarcode} onChange={e => { setFilterBarcode(e.target.value); setCurrentPage(1); }} />
+              </div>
+              <div>
+                <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Pkg Status</div>
+                <select className="form-select" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1); }}>
+                  <option value="">All</option>
+                  <option value="Dispatched">Dispatched</option>
+                  <option value="Pending For Mark">Pending For Mark</option>
+                  <option value="Already In Transit">Already In Transit</option>
+                </select>
+              </div>
+            </div>
+            <div style={{ overflowX: "auto" }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
                     {!isReadOnly() && (
-                      <td>
+                      <th style={{ width: "40px" }}>
                         <input
                           type="checkbox"
-                          checked={selectedIds.includes(item.id)}
-                          onChange={() => toggleSelectRow(item.id)}
+                          checked={isAllSelected}
+                          onChange={toggleSelectAll}
                           style={{ cursor: "pointer" }}
                         />
-                      </td>
+                      </th>
                     )}
-                    <td style={{ color: "var(--text-muted)" }}>{((currentPage - 1) * pageSize) + i + 1}</td>
-                    <td style={{ fontWeight: 500, color: "var(--text-primary)" }}>{item.call_date}</td>
-                    <td>{item.firm || <span style={{ color: "var(--text-muted)", fontStyle: "italic" }}>—</span>}</td>
-                    <td>{item.warehouse_name ? item.warehouse_name : <span style={{ color: "var(--text-muted)" }}>—</span>}</td>
-                    <td>{item.trade ? <span className="badge badge-purple">{item.trade}</span> : <span style={{ color: "var(--text-muted)" }}>—</span>}</td>
-                    <td>{item.set_type ? <span className="badge badge-orange">{item.set_type}</span> : <span style={{ color: "var(--text-muted)" }}>—</span>}</td>
-                    <td><span className="badge badge-blue" style={{ fontWeight: "700" }}>{item.quantity}</span></td>
-                    <td><code>{item.ms_barcode || "—"}</code></td>
-                    <td>
-                      <span className={`badge ${
-                        item.packaging_status === "Dispatched" ? "badge-green" :
-                        item.packaging_status === "Already In Transit" ? "badge-blue" :
-                        "badge-orange"
-                      }`}>
-                        {item.packaging_status || "Pending For Mark"}
-                      </span>
-                    </td>
-                    {!isReadOnly() && (
-                      <td>
-                        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                          <button className="btn-icon" title="Edit" onClick={() => startEdit(item)}><FiEdit2 size={13} /></button>
-                          <button
-                            className="btn-icon"
-                            style={{ color: "#3b82f6", cursor: "pointer", display: "flex", alignItems: "center" }}
-                            title="Mark as Returned (Move to Return Log)"
-                            onClick={() => handleReturnDispatch(item)}
-                          >
-                            🔄
-                          </button>
-                          {canDelete() && (
-                            deleteConfirmId === item.id ? (
-                              <span style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "12px", color: "var(--danger)" }}>
-                                Sure?
-                                <button className="btn-icon" style={{ color: "var(--danger)" }} onClick={() => deleteDispatch(item.id)}><FiCheck size={13} /></button>
-                                <button className="btn-icon" onClick={() => setDeleteConfirmId(null)}><FiX size={13} /></button>
-                              </span>
-                            ) : (
-                              <button className="btn-icon" title="Delete" style={{ color: "var(--danger)" }}
-                                onClick={() => { setDeleteConfirmId(item.id); setEditId(null); }}>
-                                <FiTrash2 size={13} />
-                              </button>
-                            )
-                          )}
-                        </div>
-                      </td>
-                    )}
+                    <th>#</th><th>Dispatched Date</th><th>Firm</th><th>Warehouse Name</th><th>Trade</th><th>Set Type</th><th>Dispatched Quantity</th><th>MS No./Barcode</th><th>Pkg Status</th>
+                    {!isReadOnly() && <th>Actions</th>}
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination Controls */}
-        {totalPages > 1 && (
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "16px", flexWrap: "wrap", gap: "10px" }}>
-            <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
-              Showing {((currentPage - 1) * pageSize) + 1} - {Math.min(currentPage * pageSize, filtered.length)} of {filtered.length} entries
-            </span>
-            <div style={{ display: "flex", gap: "4px" }}>
-              <button className="btn btn-ghost btn-sm" onClick={() => setCurrentPage(p => Math.max(p - 1, 1))} disabled={currentPage === 1}>
-                Prev
-              </button>
-              <span style={{ fontSize: "12px", fontWeight: "600", padding: "6px 12px", color: "var(--text-primary)" }}>
-                Page {currentPage} of {totalPages}
-              </span>
-              <button className="btn btn-ghost btn-sm" onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages}>
-                Next
-              </button>
+                </thead>
+                <tbody>
+                  {paginated.length === 0 ? (
+                    <tr><td colSpan={11}><div className="empty-state">No dispatch logs found.</div></td></tr>
+                  ) : (
+                    paginated.map((item, i) => (
+                      <tr id={`dispatch-row-${item.id}`} key={item.id} style={{ background: selectedIds.includes(item.id) ? "var(--bg-elevated)" : "transparent" }}>
+                        {!isReadOnly() && (
+                          <td>
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.includes(item.id)}
+                              onChange={() => toggleSelectRow(item.id)}
+                              style={{ cursor: "pointer" }}
+                            />
+                          </td>
+                        )}
+                        <td style={{ color: "var(--text-muted)" }}>{((currentPage - 1) * pageSize) + i + 1}</td>
+                        <td style={{ fontWeight: 500, color: "var(--text-primary)" }}>{item.call_date}</td>
+                        <td>{item.firm || <span style={{ color: "var(--text-muted)", fontStyle: "italic" }}>—</span>}</td>
+                        <td>{item.warehouse_name ? item.warehouse_name : <span style={{ color: "var(--text-muted)" }}>—</span>}</td>
+                        <td>{item.trade ? <span className="badge badge-purple">{item.trade}</span> : <span style={{ color: "var(--text-muted)" }}>—</span>}</td>
+                        <td>{item.set_type ? <span className="badge badge-orange">{item.set_type}</span> : <span style={{ color: "var(--text-muted)" }}>—</span>}</td>
+                        <td><span className="badge badge-blue" style={{ fontWeight: "700" }}>{item.quantity}</span></td>
+                        <td><code>{item.ms_barcode || "—"}</code></td>
+                        <td>
+                          <span className={`badge ${item.packaging_status === "Dispatched" ? "badge-green" :
+                              item.packaging_status === "Already In Transit" ? "badge-blue" :
+                                "badge-orange"
+                            }`}>
+                            {item.packaging_status || "Pending For Mark"}
+                          </span>
+                        </td>
+                        {!isReadOnly() && (
+                          <td>
+                            <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                              <button className="btn-icon" title="Edit" onClick={() => startEdit(item)}><FiEdit2 size={13} /></button>
+                              <button
+                                className="btn-icon"
+                                style={{ color: "#3b82f6", cursor: "pointer", display: "flex", alignItems: "center" }}
+                                title="Mark as Returned (Move to Return Log)"
+                                onClick={() => handleReturnDispatch(item)}
+                              >
+                                🔄
+                              </button>
+                              {canDelete() && (
+                                deleteConfirmId === item.id ? (
+                                  <span style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "12px", color: "var(--danger)" }}>
+                                    Sure?
+                                    <button className="btn-icon" style={{ color: "var(--danger)" }} onClick={() => deleteDispatch(item.id)}><FiCheck size={13} /></button>
+                                    <button className="btn-icon" onClick={() => setDeleteConfirmId(null)}><FiX size={13} /></button>
+                                  </span>
+                                ) : (
+                                  <button className="btn-icon" title="Delete" style={{ color: "var(--danger)" }}
+                                    onClick={() => { setDeleteConfirmId(item.id); setEditId(null); }}>
+                                    <FiTrash2 size={13} />
+                                  </button>
+                                )
+                              )}
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "16px", flexWrap: "wrap", gap: "10px" }}>
+                <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                  Showing {((currentPage - 1) * pageSize) + 1} - {Math.min(currentPage * pageSize, filtered.length)} of {filtered.length} entries
+                </span>
+                <div style={{ display: "flex", gap: "4px" }}>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setCurrentPage(p => Math.max(p - 1, 1))} disabled={currentPage === 1}>
+                    Prev
+                  </button>
+                  <span style={{ fontSize: "12px", fontWeight: "600", padding: "6px 12px", color: "var(--text-primary)" }}>
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages}>
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-        )}
-      </div>
         </>
       )}
     </>
@@ -1082,7 +1081,7 @@ function ReturnLog() {
         ms_barcode: editMsBarcode || null
       });
       const updatedId = editId;
-      setEditId(null); 
+      setEditId(null);
       fetchReturns();
       setTimeout(() => {
         const row = document.getElementById(`return-row-${updatedId}`);
@@ -1337,370 +1336,364 @@ function ReturnLog() {
       ) : (
         <>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginBottom: "16px", alignItems: "center" }}>
-        <input
-          type="file"
-          id="return-excel-upload"
-          accept=".xlsx,.xls"
-          style={{ display: "none" }}
-          onChange={handleExcelUpload}
-        />
-        <button className="btn btn-ghost btn-sm" onClick={() => document.getElementById("return-excel-upload").click()}>
-          <FiUpload size={13} /> Import Excel
-        </button>
-        <button className="btn btn-ghost btn-sm" onClick={exportPDF}>
-          <FiDownload size={13} /> PDF
-        </button>
-        <button className="btn btn-ghost btn-sm" onClick={exportExcel}>
-          <FiDownload size={13} /> Excel
-        </button>
-        {!isReadOnly() && (
-          <>
             <input
               type="file"
-              id="return-excel-input"
+              id="return-excel-upload"
+              accept=".xlsx,.xls"
               style={{ display: "none" }}
-              accept=".xlsx, .xls, .csv"
-              onChange={uploadExcelFile}
-              disabled={uploading}
+              onChange={handleExcelUpload}
             />
-            <button
-              className="btn btn-ghost btn-sm"
-              onClick={() => document.getElementById("return-excel-input").click()}
-              disabled={uploading}
-              style={{ display: "flex", gap: "6px", alignItems: "center" }}
-            >
-              <FiUpload size={14} /> {uploading ? "Uploading Excel..." : "Upload Excel"}
+            <button className="btn btn-ghost btn-sm" onClick={() => document.getElementById("return-excel-upload").click()}>
+              <FiUpload size={13} /> Import Excel
             </button>
-            <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setEditId(null); setMsg(""); }} disabled={uploading}>
-              <FiPlus size={14} /> {showForm ? "Cancel" : "Add Return Entry"}
+            <button className="btn btn-ghost btn-sm" onClick={exportPDF}>
+              <FiDownload size={13} /> PDF
             </button>
-          </>
-        )}
-      </div>
-
-<<<<<<< HEAD
-      {msg && (
-        <div className={`alert ${msg.startsWith("❌") || msg.includes("Failed") ? "alert-error" : "alert-success"}`} style={{ marginBottom: "16px" }}>
-          {msg}
-=======
-      {uploading && (
-        <div className="alert" style={{ background: "rgba(59, 130, 246, 0.1)", border: "1px solid rgba(59, 130, 246, 0.3)", color: "var(--accent)", marginBottom: "16px", display: "flex", alignItems: "center", gap: "10px", fontWeight: 600 }}>
-          <span>⏳ Processing and uploading Excel sheet records... Please wait, do not close the window.</span>
->>>>>>> develop
-        </div>
-      )}
-
-      {showForm && (
-        <div className="card">
-          <div className="card-title">New Return Entry</div>
-          <div className="form-grid">
-            <div className="form-group">
-              <label className="form-label">Return Date</label>
-              <input className="form-input" type="date" value={dispatchedDate} onChange={(e) => setDispatchedDate(e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Firm</label>
-              <select className="form-select" value={firm} onChange={(e) => {
-                setFirm(e.target.value);
-                setTrade("");
-                setSetType("");
-              }}>
-                <option value="">— Select Firm —</option>
-                {FIRM_OPTIONS.map(f => (
-                  <option key={f} value={f}>{f}</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Warehouse Name</label>
-              <select className="form-select" value={warehouseName} onChange={(e) => setWarehouseName(e.target.value)} disabled={isWarehouseManager()}>
-                {isWarehouseManager() ? (
-                  <option value={getWarehouseName()}>{getWarehouseName()}</option>
-                ) : (
-                  <>
-                    <option value="">— Select Warehouse —</option>
-                    {warehouses.map(w => (
-                      <option key={w.id} value={w.name}>{w.name}</option>
-                    ))}
-                  </>
-                )}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Trade Category</label>
-              <select className="form-select" value={trade} onChange={(e) => {
-                const newTrade = e.target.value;
-                setTrade(newTrade);
-                const sets = getAvailableSetTypes(firm, newTrade);
-                if (sets.length === 1) {
-                  setSetType(sets[0]);
-                } else {
-                  setSetType("");
-                }
-              }} disabled={!firm}>
-                <option value="">{firm ? "— Select Trade —" : "— Select Firm First —"}</option>
-                {firm && FIRM_TRADE_MAP[firm]?.map(t => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Set Type</label>
-              <select className="form-select" value={setType} onChange={(e) => setSetType(e.target.value)} disabled={!firm || !trade}>
-                <option value="">{firm && trade ? "— Select Set Type —" : "— Select Trade First —"}</option>
-                {getAvailableSetTypes(firm, trade).map(s => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Quantity</label>
-              <input className="form-input" type="number" placeholder="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">MS No. / Barcode</label>
-              <input className="form-input" placeholder="e.g. MS-00123" value={msBarcode} onChange={(e) => setMsBarcode(e.target.value)} />
-            </div>
-          </div>
-          {msg && <div className="alert alert-error">{msg}</div>}
-          <button className="btn btn-primary btn-sm" onClick={createReturn}><FiCheck size={13} /> Save Entry</button>
-        </div>
-      )}
-
-      {editId && (
-        <div id="return-edit-form-container" className="card">
-          <div className="card-title">Edit Return Entry — ID #{editId}</div>
-          <div className="form-grid">
-            <div className="form-group">
-              <label className="form-label">Return Date</label>
-              <input className="form-input" type="date" value={editDispatchedDate} onChange={(e) => setEditDispatchedDate(e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Firm</label>
-              <select className="form-select" value={editFirm} onChange={(e) => {
-                setEditFirm(e.target.value);
-                setEditTrade("");
-                setEditSetType("");
-              }}>
-                <option value="">— Select Firm —</option>
-                {FIRM_OPTIONS.map(f => (
-                  <option key={f} value={f}>{f}</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Warehouse Name</label>
-              <select className="form-select" value={editWarehouseName} onChange={(e) => setEditWarehouseName(e.target.value)} disabled={isWarehouseManager()}>
-                {isWarehouseManager() ? (
-                  <option value={getWarehouseName()}>{getWarehouseName()}</option>
-                ) : (
-                  <>
-                    <option value="">— Select Warehouse —</option>
-                    {warehouses.map(w => (
-                      <option key={w.id} value={w.name}>{w.name}</option>
-                    ))}
-                  </>
-                )}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Trade Category</label>
-              <select className="form-select" value={editTrade} onChange={(e) => {
-                const newTrade = e.target.value;
-                setEditTrade(newTrade);
-                const sets = getAvailableSetTypes(editFirm, newTrade);
-                if (sets.length === 1) {
-                  setEditSetType(sets[0]);
-                } else {
-                  setEditSetType("");
-                }
-              }} disabled={!editFirm}>
-                <option value="">{editFirm ? "— Select Trade —" : "— Select Firm First —"}</option>
-                {editFirm && FIRM_TRADE_MAP[editFirm]?.map(t => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Set Type</label>
-              <select className="form-select" value={editSetType} onChange={(e) => setEditSetType(e.target.value)} disabled={!editFirm || !editTrade}>
-                <option value="">{editFirm && editTrade ? "— Select Set Type —" : "— Select Trade First —"}</option>
-                {getAvailableSetTypes(editFirm, editTrade).map(s => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Quantity</label>
-              <input className="form-input" type="number" value={editQuantity} onChange={(e) => setEditQuantity(e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">MS No. / Barcode</label>
-              <input className="form-input" value={editMsBarcode} onChange={(e) => setEditMsBarcode(e.target.value)} />
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: "10px", marginTop: "12px" }}>
-            <button className="btn btn-primary btn-sm" onClick={updateReturn}><FiCheck size={13} /> Save Changes</button>
-            <button className="btn btn-ghost btn-sm" onClick={() => {
-              const prevId = editId;
-              setEditId(null);
-              setTimeout(() => {
-                const row = document.getElementById(`return-row-${prevId}`);
-                if (row) {
-                  row.scrollIntoView({ behavior: "smooth", block: "center" });
-                }
-              }, 100);
-            }}><FiX size={13} /> Cancel</button>
-          </div>
-        </div>
-      )}
-
-      <div className="card">
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", flexWrap: "wrap", gap: "12px" }}>
-        <span style={{ fontWeight: 600, color: "var(--text-primary)", fontSize: "14px" }}>Return Logs ({filtered.length})</span>
-        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-          {selectedIds.length > 0 && canDelete() && (
-            <button className="btn btn-danger btn-sm" onClick={deleteSelected}>
-              <FiTrash2 size={13} /> Delete Selected ({selectedIds.length})
+            <button className="btn btn-ghost btn-sm" onClick={exportExcel}>
+              <FiDownload size={13} /> Excel
             </button>
-          )}
-          {hasActiveFilters && (
-            <button className="btn btn-ghost btn-sm" onClick={clearFilters} style={{ color: "var(--danger)", borderColor: "var(--danger)" }}>
-              <FiX size={12} /> Clear Filters
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Filter Row */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "8px", marginBottom: "14px", padding: "12px", background: "var(--bg-elevated)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
-        <div>
-          <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Return Date</div>
-          <input className="form-input" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} type="text" placeholder="e.g. 01/01/2025" value={filterDate} onChange={e => { setFilterDate(e.target.value); setCurrentPage(1); }} />
-        </div>
-        <div>
-          <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Firm</div>
-          <select className="form-select" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} value={filterFirm} onChange={e => { setFilterFirm(e.target.value); setCurrentPage(1); }}>
-            <option value="">All</option>
-            {FIRM_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
-          </select>
-        </div>
-        <div>
-          <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Warehouse</div>
-          <select className="form-select" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} value={filterWarehouse} onChange={e => { setFilterWarehouse(e.target.value); setCurrentPage(1); }} disabled={isWarehouseManager()}>
-            {isWarehouseManager() ? (
-              <option value={getWarehouseName()}>{getWarehouseName()}</option>
-            ) : (
+            {!isReadOnly() && (
               <>
-                <option value="">All</option>
-                {uniqueWarehouses.map(w => <option key={w} value={w}>{w}</option>)}
+                <input
+                  type="file"
+                  id="return-excel-input"
+                  style={{ display: "none" }}
+                  accept=".xlsx, .xls, .csv"
+                  onChange={uploadExcelFile}
+                  disabled={uploading}
+                />
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => document.getElementById("return-excel-input").click()}
+                  disabled={uploading}
+                  style={{ display: "flex", gap: "6px", alignItems: "center" }}
+                >
+                  <FiUpload size={14} /> {uploading ? "Uploading Excel..." : "Upload Excel"}
+                </button>
+                <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setEditId(null); setMsg(""); }} disabled={uploading}>
+                  <FiPlus size={14} /> {showForm ? "Cancel" : "Add Return Entry"}
+                </button>
               </>
             )}
-          </select>
-        </div>
-        <div>
-          <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Trade</div>
-          <select className="form-select" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} value={filterTrade} onChange={e => { setFilterTrade(e.target.value); setCurrentPage(1); }}>
-            <option value="">All</option>
-            {uniqueTrades.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
-        </div>
-        <div>
-          <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Set Type</div>
-          <select className="form-select" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} value={filterSetType} onChange={e => { setFilterSetType(e.target.value); setCurrentPage(1); }}>
-            <option value="">All</option>
-            <option value="SET A">SET A</option>
-            <option value="SET B">SET B</option>
-          </select>
-        </div>
-        <div>
-          <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>MS No./Barcode</div>
-          <input className="form-input" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} type="text" placeholder="Search..." value={filterBarcode} onChange={e => { setFilterBarcode(e.target.value); setCurrentPage(1); }} />
-        </div>
-      </div>
-        <div style={{ overflowX: "auto" }}>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th style={{ width: "40px" }}>
-                  <input
-                    type="checkbox"
-                    checked={isAllSelected}
-                    onChange={toggleSelectAll}
-                    style={{ cursor: "pointer" }}
-                  />
-                </th>
-                <th>#</th><th>Return Date</th><th>Firm</th><th>Warehouse Name</th><th>Trade</th><th>Set Type</th><th>Quantity</th><th>MS No./Barcode</th><th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginated.length === 0 ? (
-                <tr><td colSpan={10}><div className="empty-state">No return entries found.</div></td></tr>
-              ) : (
-                paginated.map((item, i) => (
-                  <tr id={`return-row-${item.id}`} key={item.id} style={{ background: selectedIds.includes(item.id) ? "var(--bg-elevated)" : "transparent" }}>
-                    <td>
+          </div>
+
+          {uploading && (
+            <div className="alert" style={{ background: "rgba(59, 130, 246, 0.1)", border: "1px solid rgba(59, 130, 246, 0.3)", color: "var(--accent)", marginBottom: "16px", display: "flex", alignItems: "center", gap: "10px", fontWeight: 600 }}>
+              <span>⏳ Processing and uploading Excel sheet records... Please wait, do not close the window.</span>
+            </div>
+          )}
+
+          {showForm && (
+            <div className="card">
+              <div className="card-title">New Return Entry</div>
+              <div className="form-grid">
+                <div className="form-group">
+                  <label className="form-label">Return Date</label>
+                  <input className="form-input" type="date" value={dispatchedDate} onChange={(e) => setDispatchedDate(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Firm</label>
+                  <select className="form-select" value={firm} onChange={(e) => {
+                    setFirm(e.target.value);
+                    setTrade("");
+                    setSetType("");
+                  }}>
+                    <option value="">— Select Firm —</option>
+                    {FIRM_OPTIONS.map(f => (
+                      <option key={f} value={f}>{f}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Warehouse Name</label>
+                  <select className="form-select" value={warehouseName} onChange={(e) => setWarehouseName(e.target.value)} disabled={isWarehouseManager()}>
+                    {isWarehouseManager() ? (
+                      <option value={getWarehouseName()}>{getWarehouseName()}</option>
+                    ) : (
+                      <>
+                        <option value="">— Select Warehouse —</option>
+                        {warehouses.map(w => (
+                          <option key={w.id} value={w.name}>{w.name}</option>
+                        ))}
+                      </>
+                    )}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Trade Category</label>
+                  <select className="form-select" value={trade} onChange={(e) => {
+                    const newTrade = e.target.value;
+                    setTrade(newTrade);
+                    const sets = getAvailableSetTypes(firm, newTrade);
+                    if (sets.length === 1) {
+                      setSetType(sets[0]);
+                    } else {
+                      setSetType("");
+                    }
+                  }} disabled={!firm}>
+                    <option value="">{firm ? "— Select Trade —" : "— Select Firm First —"}</option>
+                    {firm && FIRM_TRADE_MAP[firm]?.map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Set Type</label>
+                  <select className="form-select" value={setType} onChange={(e) => setSetType(e.target.value)} disabled={!firm || !trade}>
+                    <option value="">{firm && trade ? "— Select Set Type —" : "— Select Trade First —"}</option>
+                    {getAvailableSetTypes(firm, trade).map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Quantity</label>
+                  <input className="form-input" type="number" placeholder="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">MS No. / Barcode</label>
+                  <input className="form-input" placeholder="e.g. MS-00123" value={msBarcode} onChange={(e) => setMsBarcode(e.target.value)} />
+                </div>
+              </div>
+              {msg && <div className="alert alert-error">{msg}</div>}
+              <button className="btn btn-primary btn-sm" onClick={createReturn}><FiCheck size={13} /> Save Entry</button>
+            </div>
+          )}
+
+          {editId && (
+            <div id="return-edit-form-container" className="card">
+              <div className="card-title">Edit Return Entry — ID #{editId}</div>
+              <div className="form-grid">
+                <div className="form-group">
+                  <label className="form-label">Return Date</label>
+                  <input className="form-input" type="date" value={editDispatchedDate} onChange={(e) => setEditDispatchedDate(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Firm</label>
+                  <select className="form-select" value={editFirm} onChange={(e) => {
+                    setEditFirm(e.target.value);
+                    setEditTrade("");
+                    setEditSetType("");
+                  }}>
+                    <option value="">— Select Firm —</option>
+                    {FIRM_OPTIONS.map(f => (
+                      <option key={f} value={f}>{f}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Warehouse Name</label>
+                  <select className="form-select" value={editWarehouseName} onChange={(e) => setEditWarehouseName(e.target.value)} disabled={isWarehouseManager()}>
+                    {isWarehouseManager() ? (
+                      <option value={getWarehouseName()}>{getWarehouseName()}</option>
+                    ) : (
+                      <>
+                        <option value="">— Select Warehouse —</option>
+                        {warehouses.map(w => (
+                          <option key={w.id} value={w.name}>{w.name}</option>
+                        ))}
+                      </>
+                    )}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Trade Category</label>
+                  <select className="form-select" value={editTrade} onChange={(e) => {
+                    const newTrade = e.target.value;
+                    setEditTrade(newTrade);
+                    const sets = getAvailableSetTypes(editFirm, newTrade);
+                    if (sets.length === 1) {
+                      setEditSetType(sets[0]);
+                    } else {
+                      setEditSetType("");
+                    }
+                  }} disabled={!editFirm}>
+                    <option value="">{editFirm ? "— Select Trade —" : "— Select Firm First —"}</option>
+                    {editFirm && FIRM_TRADE_MAP[editFirm]?.map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Set Type</label>
+                  <select className="form-select" value={editSetType} onChange={(e) => setEditSetType(e.target.value)} disabled={!editFirm || !editTrade}>
+                    <option value="">{editFirm && editTrade ? "— Select Set Type —" : "— Select Trade First —"}</option>
+                    {getAvailableSetTypes(editFirm, editTrade).map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Quantity</label>
+                  <input className="form-input" type="number" value={editQuantity} onChange={(e) => setEditQuantity(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">MS No. / Barcode</label>
+                  <input className="form-input" value={editMsBarcode} onChange={(e) => setEditMsBarcode(e.target.value)} />
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: "10px", marginTop: "12px" }}>
+                <button className="btn btn-primary btn-sm" onClick={updateReturn}><FiCheck size={13} /> Save Changes</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => {
+                  const prevId = editId;
+                  setEditId(null);
+                  setTimeout(() => {
+                    const row = document.getElementById(`return-row-${prevId}`);
+                    if (row) {
+                      row.scrollIntoView({ behavior: "smooth", block: "center" });
+                    }
+                  }, 100);
+                }}><FiX size={13} /> Cancel</button>
+              </div>
+            </div>
+          )}
+
+          <div className="card">
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", flexWrap: "wrap", gap: "12px" }}>
+              <span style={{ fontWeight: 600, color: "var(--text-primary)", fontSize: "14px" }}>Return Logs ({filtered.length})</span>
+              <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                {selectedIds.length > 0 && canDelete() && (
+                  <button className="btn btn-danger btn-sm" onClick={deleteSelected}>
+                    <FiTrash2 size={13} /> Delete Selected ({selectedIds.length})
+                  </button>
+                )}
+                {hasActiveFilters && (
+                  <button className="btn btn-ghost btn-sm" onClick={clearFilters} style={{ color: "var(--danger)", borderColor: "var(--danger)" }}>
+                    <FiX size={12} /> Clear Filters
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Filter Row */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "8px", marginBottom: "14px", padding: "12px", background: "var(--bg-elevated)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
+              <div>
+                <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Return Date</div>
+                <input className="form-input" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} type="text" placeholder="e.g. 01/01/2025" value={filterDate} onChange={e => { setFilterDate(e.target.value); setCurrentPage(1); }} />
+              </div>
+              <div>
+                <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Firm</div>
+                <select className="form-select" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} value={filterFirm} onChange={e => { setFilterFirm(e.target.value); setCurrentPage(1); }}>
+                  <option value="">All</option>
+                  {FIRM_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
+                </select>
+              </div>
+              <div>
+                <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Warehouse</div>
+                <select className="form-select" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} value={filterWarehouse} onChange={e => { setFilterWarehouse(e.target.value); setCurrentPage(1); }} disabled={isWarehouseManager()}>
+                  {isWarehouseManager() ? (
+                    <option value={getWarehouseName()}>{getWarehouseName()}</option>
+                  ) : (
+                    <>
+                      <option value="">All</option>
+                      {uniqueWarehouses.map(w => <option key={w} value={w}>{w}</option>)}
+                    </>
+                  )}
+                </select>
+              </div>
+              <div>
+                <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Trade</div>
+                <select className="form-select" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} value={filterTrade} onChange={e => { setFilterTrade(e.target.value); setCurrentPage(1); }}>
+                  <option value="">All</option>
+                  {uniqueTrades.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Set Type</div>
+                <select className="form-select" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} value={filterSetType} onChange={e => { setFilterSetType(e.target.value); setCurrentPage(1); }}>
+                  <option value="">All</option>
+                  <option value="SET A">SET A</option>
+                  <option value="SET B">SET B</option>
+                </select>
+              </div>
+              <div>
+                <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>MS No./Barcode</div>
+                <input className="form-input" style={{ height: "30px", fontSize: "12px", padding: "4px 8px" }} type="text" placeholder="Search..." value={filterBarcode} onChange={e => { setFilterBarcode(e.target.value); setCurrentPage(1); }} />
+              </div>
+            </div>
+            <div style={{ overflowX: "auto" }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: "40px" }}>
                       <input
                         type="checkbox"
-                        checked={selectedIds.includes(item.id)}
-                        onChange={() => toggleSelectRow(item.id)}
+                        checked={isAllSelected}
+                        onChange={toggleSelectAll}
                         style={{ cursor: "pointer" }}
                       />
-                    </td>
-                    <td style={{ color: "var(--text-muted)" }}>{((currentPage - 1) * pageSize) + i + 1}</td>
-                    <td style={{ fontWeight: 500, color: "var(--text-primary)" }}>{item.dispatched_date}</td>
-                    <td>{item.firm || <span style={{ color: "var(--text-muted)", fontStyle: "italic" }}>—</span>}</td>
-                    <td>{item.warehouse_name || "—"}</td>
-                    <td>{item.trade ? <span className="badge badge-purple">{item.trade}</span> : "—"}</td>
-                    <td>{item.set_type ? <span className="badge badge-orange">{item.set_type}</span> : <span style={{ color: "var(--text-muted)" }}>—</span>}</td>
-                    <td><span className="badge badge-blue" style={{ fontWeight: "700" }}>{item.quantity || 1}</span></td>
-                    <td><code>{item.ms_barcode || "—"}</code></td>
-                    <td>
-                      <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                        <button className="btn-icon" title="Edit" onClick={() => startEditReturn(item)}><FiEdit2 size={13} /></button>
-                        {canDelete() && (
-                          deleteConfirmId === item.id ? (
-                            <span style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "12px", color: "var(--danger)" }}>
-                              Sure?
-                              <button className="btn-icon" style={{ color: "var(--danger)" }} onClick={() => deleteReturn(item.id)}><FiCheck size={13} /></button>
-                              <button className="btn-icon" onClick={() => setDeleteConfirmId(null)}><FiX size={13} /></button>
-                            </span>
-                          ) : (
-                            <button className="btn-icon" title="Delete" style={{ color: "var(--danger)" }}
-                              onClick={() => { setDeleteConfirmId(item.id); setEditId(null); }}>
-                              <FiTrash2 size={13} />
-                            </button>
-                          )
-                        )}
-                      </div>
-                    </td>
+                    </th>
+                    <th>#</th><th>Return Date</th><th>Firm</th><th>Warehouse Name</th><th>Trade</th><th>Set Type</th><th>Quantity</th><th>MS No./Barcode</th><th>Actions</th>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination Controls */}
-        {totalPages > 1 && (
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "16px", flexWrap: "wrap", gap: "10px" }}>
-            <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
-              Showing {((currentPage - 1) * pageSize) + 1} - {Math.min(currentPage * pageSize, filtered.length)} of {filtered.length} entries
-            </span>
-            <div style={{ display: "flex", gap: "4px" }}>
-              <button className="btn btn-ghost btn-sm" onClick={() => setCurrentPage(p => Math.max(p - 1, 1))} disabled={currentPage === 1}>
-                Prev
-              </button>
-              <span style={{ fontSize: "12px", fontWeight: "600", padding: "6px 12px", color: "var(--text-primary)" }}>
-                Page {currentPage} of {totalPages}
-              </span>
-              <button className="btn btn-ghost btn-sm" onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages}>
-                Next
-              </button>
+                </thead>
+                <tbody>
+                  {paginated.length === 0 ? (
+                    <tr><td colSpan={10}><div className="empty-state">No return entries found.</div></td></tr>
+                  ) : (
+                    paginated.map((item, i) => (
+                      <tr id={`return-row-${item.id}`} key={item.id} style={{ background: selectedIds.includes(item.id) ? "var(--bg-elevated)" : "transparent" }}>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(item.id)}
+                            onChange={() => toggleSelectRow(item.id)}
+                            style={{ cursor: "pointer" }}
+                          />
+                        </td>
+                        <td style={{ color: "var(--text-muted)" }}>{((currentPage - 1) * pageSize) + i + 1}</td>
+                        <td style={{ fontWeight: 500, color: "var(--text-primary)" }}>{item.dispatched_date}</td>
+                        <td>{item.firm || <span style={{ color: "var(--text-muted)", fontStyle: "italic" }}>—</span>}</td>
+                        <td>{item.warehouse_name || "—"}</td>
+                        <td>{item.trade ? <span className="badge badge-purple">{item.trade}</span> : "—"}</td>
+                        <td>{item.set_type ? <span className="badge badge-orange">{item.set_type}</span> : <span style={{ color: "var(--text-muted)" }}>—</span>}</td>
+                        <td><span className="badge badge-blue" style={{ fontWeight: "700" }}>{item.quantity || 1}</span></td>
+                        <td><code>{item.ms_barcode || "—"}</code></td>
+                        <td>
+                          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                            <button className="btn-icon" title="Edit" onClick={() => startEditReturn(item)}><FiEdit2 size={13} /></button>
+                            {canDelete() && (
+                              deleteConfirmId === item.id ? (
+                                <span style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "12px", color: "var(--danger)" }}>
+                                  Sure?
+                                  <button className="btn-icon" style={{ color: "var(--danger)" }} onClick={() => deleteReturn(item.id)}><FiCheck size={13} /></button>
+                                  <button className="btn-icon" onClick={() => setDeleteConfirmId(null)}><FiX size={13} /></button>
+                                </span>
+                              ) : (
+                                <button className="btn-icon" title="Delete" style={{ color: "var(--danger)" }}
+                                  onClick={() => { setDeleteConfirmId(item.id); setEditId(null); }}>
+                                  <FiTrash2 size={13} />
+                                </button>
+                              )
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "16px", flexWrap: "wrap", gap: "10px" }}>
+                <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                  Showing {((currentPage - 1) * pageSize) + 1} - {Math.min(currentPage * pageSize, filtered.length)} of {filtered.length} entries
+                </span>
+                <div style={{ display: "flex", gap: "4px" }}>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setCurrentPage(p => Math.max(p - 1, 1))} disabled={currentPage === 1}>
+                    Prev
+                  </button>
+                  <span style={{ fontSize: "12px", fontWeight: "600", padding: "6px 12px", color: "var(--text-primary)" }}>
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages}>
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-        )}
-      </div>
         </>
       )}
     </>
