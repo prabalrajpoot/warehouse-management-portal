@@ -138,19 +138,9 @@ def dashboard(
             return "ITI"
 
         t = (k.trade or "").strip().lower()
-        s = (k.set_type or "").strip().upper()
-
         if "barber" in t or "naai" in t:
-            if "B" in s or "SET B" in s:
-                return "ITI"
-            return "PTL"
-        if "potter" in t or "kumhar" in t:
-            if (k.quantity or 0) < 500:
-                return "ITI"
-            return "VTL"
-        if "washer" in t or "dhobi" in t:
-            if (k.quantity or 0) < 500:
-                return "ITI"
+            return "ITI"
+        if "potter" in t or "kumhar" in t or "washer" in t or "dhobi" in t:
             return "VTL"
         return "PTL"
 
