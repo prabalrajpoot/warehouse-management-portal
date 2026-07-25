@@ -287,7 +287,7 @@ function Dashboard() {
 
   const stats = [
     { label: "Kit Made", value: data.total_kits, icon: <FiBox size={18} />, color: "var(--accent)", gradientClass: "gradient-icon-box" },
-    { label: "Inspected Qty", value: data.total_inspected, icon: <FiCheckCircle size={18} />, color: "var(--success)", gradientClass: "gradient-icon-box-success" },
+    { label: "Inspected Qty", value: data.inspected_passed || 0, icon: <FiCheckCircle size={18} />, color: "var(--success)", gradientClass: "gradient-icon-box-success" },
     { label: "Dispatched Qty", value: data.total_dispatched, icon: <FiTruck size={18} />, color: "var(--warning)", gradientClass: "gradient-icon-box-warning" },
     { label: "Returned Qty", value: data.total_returned_qty || 0, icon: <FiRotateCcw size={18} />, color: "var(--danger)", gradientClass: "gradient-icon-box-danger" }
   ];
@@ -1172,45 +1172,23 @@ function Dashboard() {
           activeDashboardTab === "overview" && (
             <>
               {/* Workflow Stats cards (4 Columns) */}
-              {(() => {
-                let ptl = data.kits_ptl || 0;
-                let vtl = data.kits_vtl || 0;
-                let iti = data.kits_iti || 0;
-                if ((ptl === 0 && vtl === 0 && iti === 0) && data.trade_summary && data.trade_summary.length > 0) {
-                  data.trade_summary.forEach(item => {
-                    const tradeName = (item.name || "").toLowerCase();
-                    const qty = item["Kits Made"] || 0;
-                    if (["armourer", "metal", "sculptor", "hammer", "fishing", "boat"].some(x => tradeName.includes(x))) {
-                      ptl += qty;
-                    } else if (["potter", "washerman"].some(x => tradeName.includes(x))) {
-                      vtl += qty;
-                    } else if (["barber", "naai"].some(x => tradeName.includes(x))) {
-                      iti += qty;
-                    } else {
-                      ptl += qty;
-                    }
-                  });
-                }
-                const firmTotals = { ptl, vtl, iti };
-
-                return (
-                  <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "20px" }}>
-                    {stats.map((s) => (
-                      <div className="glass-card interactive-stat-card" key={s.label} style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "20px 22px", borderRadius: "var(--radius-lg)" }}>
-                        <div>
-                          <div className={`stat-icon ${s.gradientClass}`}>
-                            {s.icon}
-                          </div>
-                          <div className="stat-label">{s.label}</div>
-                          <div className="stat-value" style={{ color: s.color }}>{s.value}</div>
-                        </div>
-                        {(s.label === "Kit Made" || s.label === "Kits Made" || s.label === "Total Kits Made") && (
-                          <div style={{ fontSize: "10.5px", color: "var(--text-secondary)", marginTop: "8px", borderTop: "1px solid var(--border)", paddingTop: "6px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "4px", whiteSpace: "nowrap" }}>
-                            <span style={{ color: "var(--accent)", fontWeight: 600 }}>🔹PTL: {firmTotals.ptl}</span>
-                            <span style={{ color: "var(--success)", fontWeight: 600 }}>🔹VTL: {firmTotals.vtl}</span>
-                            <span style={{ color: "var(--warning)", fontWeight: 600 }}>🔹ITI: {firmTotals.iti}</span>
-                          </div>
-                        )}
+              <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "20px" }}>
+                {stats.map((s) => (
+                  <div className="glass-card interactive-stat-card" key={s.label} style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "20px 22px", borderRadius: "var(--radius-lg)" }}>
+                    <div>
+                      <div className={`stat-icon ${s.gradientClass}`}>
+                        {s.icon}
+                      </div>
+                      <div className="stat-label">{s.label}</div>
+                      <div className="stat-value" style={{ color: s.color }}>{s.value}</div>
+                    </div>
+                    {(s.label === "Kit Made" || s.label === "Kits Made" || s.label === "Total Kits Made") && (
+                      <div style={{ fontSize: "10.5px", color: "var(--text-secondary)", marginTop: "8px", borderTop: "1px solid var(--border)", paddingTop: "6px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "4px", whiteSpace: "nowrap" }}>
+                        <span style={{ color: "var(--accent)", fontWeight: 600 }}>🔹PTL: {data.kits_ptl || 0}</span>
+                        <span style={{ color: "var(--success)", fontWeight: 600 }}>🔹VTL: {data.kits_vtl || 0}</span>
+                        <span style={{ color: "var(--warning)", fontWeight: 600 }}>🔹ITI: {data.kits_iti || 0}</span>
+                      </div>
+                    )}
                     {s.label === "Inspected Qty" && (
                       <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "8px", borderTop: "1px solid var(--border)", paddingTop: "6px", display: "flex", flexWrap: "wrap", gap: "10px" }}>
                         <span style={{ color: "var(--success)", fontWeight: 600 }}>✔ Pass: {data.inspected_passed}</span>
@@ -1229,14 +1207,12 @@ function Dashboard() {
                     )}
                     {s.label === "Returned Qty" && (
                       <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "8px", borderTop: "1px solid var(--border)", paddingTop: "6px" }}>
-                        <span style={{ color: "var(--danger)", fontWeight: 600 }}>🔄 Count: {data.total_returned || 0} lots</span>
+                        <span style={{ color: "var(--danger)", fontWeight: 600 }}>🔄 Count: {data.total_returned || 0} kits</span>
                       </div>
                     )}
                   </div>
                 ))}
               </div>
-            );
-          })()}
 
               {/* Monthly Summary Chart (Full Width) */}
               <div className="glass-card" style={{ padding: "24px", borderRadius: "var(--radius-lg)", marginTop: "24px" }}>

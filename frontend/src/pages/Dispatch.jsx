@@ -1244,8 +1244,18 @@ function ReturnLog() {
 
         const findKey = (obj, aliases) => {
           const keys = Object.keys(obj);
+          // Pass 1: Exact match
           for (const alias of aliases) {
             const match = keys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g, "") === alias.toLowerCase().replace(/[^a-z0-9]/g, ""));
+            if (match) return match;
+          }
+          // Pass 2: Partial / Substring match
+          for (const alias of aliases) {
+            const match = keys.find(k => {
+              const normK = k.toLowerCase().replace(/[^a-z0-9]/g, "");
+              const normA = alias.toLowerCase().replace(/[^a-z0-9]/g, "");
+              return normK.includes(normA) || normA.includes(normK);
+            });
             if (match) return match;
           }
           return null;
@@ -1292,7 +1302,11 @@ function ReturnLog() {
           const qtyKey = findKey(row, ["quantity", "qty", "count"]);
           const qtyVal = qtyKey ? Number(row[qtyKey]) : 1;
 
-          const msKey = findKey(row, ["msbarcode", "barcode", "ms_barcode", "msno"]);
+          const msKey = findKey(row, [
+            "msnobarcode", "msbarcode", "barcode", "ms_barcode", "msno", "msnumber",
+            "labelnumber", "labelnumber1", "labelnumber2", "labelnumber3", "label",
+            "serialno", "serialnumber", "serial", "ms"
+          ]);
           const msVal = msKey ? String(row[msKey]).trim() : "";
 
           return {
