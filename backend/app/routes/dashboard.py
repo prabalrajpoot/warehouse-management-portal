@@ -119,13 +119,6 @@ def dashboard(
             return "VTL"
         if "ITI" in f:
             return "ITI"
-        t = (k.trade or "").strip().lower()
-        if any(x in t for x in ["armourer", "metal", "sculptor", "hammer", "fishing", "boat"]):
-            return "PTL"
-        if any(x in t for x in ["potter", "washerman"]):
-            return "VTL"
-        if any(x in t for x in ["barber", "naai"]):
-            return "ITI"
         return f
 
     kits_ptl = sum(k.quantity for k in kits if get_firm_val(k) == "PTL")
