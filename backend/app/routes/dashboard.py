@@ -136,19 +136,13 @@ def dashboard(
             return "VTL"
         if "ITI" in f:
             return "ITI"
-        # Fallback: derive from trade name when firm column is NULL/empty in DB
+        # Fallback from trade name when firm is NULL/empty in DB
         t = (k.trade or "").strip().lower()
-        if any(x in t for x in ["armourer", "metal", "sculptor", "hammer", "fishing", "boat", "barber", "naai"]):
-            # Barber/Naai appears in PTL mapping too — check set_type to distinguish
-            if ("barber" in t or "naai" in t):
-                s = (k.set_type or "").strip().upper()
-                if "B" in s:
-                    return "ITI"
-                return "PTL"
-            return "PTL"
+        if any(x in t for x in ["barber", "naai"]):
+            return "ITI"
         if any(x in t for x in ["potter", "kumhar", "washerman", "dhobi"]):
             return "VTL"
-        return "PTL"  # safest default
+        return "PTL"
 
     kits_ptl = sum(k.quantity for k in kits if get_firm_val(k) == "PTL")
     kits_vtl = sum(k.quantity for k in kits if get_firm_val(k) == "VTL")

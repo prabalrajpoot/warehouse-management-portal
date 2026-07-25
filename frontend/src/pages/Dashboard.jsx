@@ -1191,8 +1191,8 @@ function Dashboard() {
                         data.trade_summary.forEach(item => {
                           const tradeName = (item.name || "").toLowerCase();
                           const qty = item["Kits Made"] || 0;
-                          if (["armourer", "metal", "sculptor", "hammer", "fishing", "boat"].some(x => tradeName.includes(x))) {
-                            ptl += qty;
+                          if (["barber", "naai"].some(x => tradeName.includes(x))) {
+                            iti += qty;
                           } else if (["potter", "washerman", "kumhar", "dhobi"].some(x => tradeName.includes(x))) {
                             vtl += qty;
                           } else {
