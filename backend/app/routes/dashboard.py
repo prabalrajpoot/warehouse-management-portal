@@ -26,6 +26,27 @@ def parse_date(date_str):
     return None
 
 
+@router.get("/dashboard/firm-debug")
+def firm_debug(db: Session = Depends(get_db)):
+    """Debug endpoint to inspect firm values in the live DB."""
+    from collections import defaultdict
+    kits = db.query(Kit).all()
+    firm_qty = defaultdict(int)
+    firm_count = defaultdict(int)
+    for k in kits:
+        key = repr(k.firm)
+        firm_qty[key] += k.quantity
+        firm_count[key] += 1
+    return {
+        "total_rows": len(kits),
+        "total_qty": sum(k.quantity for k in kits),
+        "firm_distribution": [
+            {"firm": f, "row_count": firm_count[f], "total_qty": firm_qty[f]}
+            for f in sorted(firm_qty.keys(), key=lambda x: -firm_qty[x])
+        ]
+    }
+
+
 @router.get("/dashboard")
 def dashboard(
     warehouse: Optional[str] = None,
@@ -115,7 +136,19 @@ def dashboard(
             return "VTL"
         if "ITI" in f:
             return "ITI"
-        return f
+        # Fallback: derive from trade name when firm column is NULL/empty in DB
+        t = (k.trade or "").strip().lower()
+        if any(x in t for x in ["armourer", "metal", "sculptor", "hammer", "fishing", "boat", "barber", "naai"]):
+            # Barber/Naai appears in PTL mapping too — check set_type to distinguish
+            if ("barber" in t or "naai" in t):
+                s = (k.set_type or "").strip().upper()
+                if "B" in s:
+                    return "ITI"
+                return "PTL"
+            return "PTL"
+        if any(x in t for x in ["potter", "kumhar", "washerman", "dhobi"]):
+            return "VTL"
+        return "PTL"  # safest default
 
     kits_ptl = sum(k.quantity for k in kits if get_firm_val(k) == "PTL")
     kits_vtl = sum(k.quantity for k in kits if get_firm_val(k) == "VTL")
