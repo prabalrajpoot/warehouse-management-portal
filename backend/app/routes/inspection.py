@@ -23,6 +23,19 @@ class InspectionCreate(BaseModel):
     quantity: int
 
 
+def normalize_inspection_passed(raw_passed: Optional[str]) -> str:
+    if not raw_passed:
+        return "Pass"
+    s = str(raw_passed).strip().lower()
+    if "fail" in s or "reject" in s or s == "f" or s == "0":
+        return "Fail"
+    if "pend" in s or "hold" in s or "under" in s:
+        return "Pending"
+    if "pass" in s or s == "p" or s == "1" or s == "ok":
+        return "Pass"
+    return str(raw_passed).strip().title()
+
+
 @router.post("/inspection")
 def create_inspection(
     payload: InspectionCreate,
@@ -41,7 +54,7 @@ def create_inspection(
         warehouse_name=wh_val,
         trade=trade_val,
         set_type=set_type_val,
-        inspection_passed=payload.inspection_passed,
+        inspection_passed=normalize_inspection_passed(payload.inspection_passed),
         inspection_no=payload.inspection_no,
         ins_passed_date=payload.ins_passed_date,
         quantity=payload.quantity
@@ -98,7 +111,7 @@ def update_inspection(
     inspection.warehouse_name = wh_val  # type: ignore
     inspection.trade = trade_val  # type: ignore
     inspection.set_type = set_type_val  # type: ignore
-    inspection.inspection_passed = payload.inspection_passed  # type: ignore
+    inspection.inspection_passed = normalize_inspection_passed(payload.inspection_passed)  # type: ignore
     inspection.inspection_no = payload.inspection_no  # type: ignore
     inspection.ins_passed_date = payload.ins_passed_date  # type: ignore
     inspection.quantity = payload.quantity  # type: ignore
@@ -172,7 +185,7 @@ def create_inspections_bulk(
                     warehouse_name=wh_val,
                     trade=trade_val,
                     set_type=set_type_val,
-                    inspection_passed=entry.inspection_passed,
+                    inspection_passed=normalize_inspection_passed(entry.inspection_passed),
                     inspection_no=entry.inspection_no,
                     ins_passed_date=entry.ins_passed_date,
                     quantity=entry.quantity

@@ -263,8 +263,27 @@ function Inspection() {
           const setTypeKey = findKey(row, ["settype", "set_type", "type", "typename"]);
           const setTypeVal = setTypeKey ? String(row[setTypeKey]).trim() : "";
 
-          const passedKey = findKey(row, ["inspectionpassed", "passed", "status", "passedstatus", "inspection_passed"]);
-          const passedVal = passedKey ? String(row[passedKey]).trim() : "Pass";
+          const passedKey = findKey(row, [
+            "inspectionpassed", "passed", "status", "passedstatus", "inspection_passed",
+            "result", "inspectionresult", "qaaresult", "offerresult", "passfail", "inspectionstatus",
+            "qaa", "qaastatus", "inspection_result", "qaa_result", "offer_result", "pass_fail",
+            "inspection_status", "remark", "inspection_remark", "outcome", "statusremark"
+          ]);
+          
+          let passedVal = "Pass";
+          if (passedKey && row[passedKey] !== undefined && row[passedKey] !== null) {
+            const rawStr = String(row[passedKey]).trim();
+            const lowerStr = rawStr.toLowerCase();
+            if (lowerStr.includes("fail") || lowerStr.includes("reject") || lowerStr === "f" || lowerStr === "0") {
+              passedVal = "Fail";
+            } else if (lowerStr.includes("pend") || lowerStr.includes("hold") || lowerStr.includes("under")) {
+              passedVal = "Pending";
+            } else if (lowerStr.includes("pass") || lowerStr === "p" || lowerStr === "1" || lowerStr.includes("ok")) {
+              passedVal = "Pass";
+            } else if (rawStr) {
+              passedVal = rawStr.charAt(0).toUpperCase() + rawStr.slice(1).toLowerCase();
+            }
+          }
 
           const insNoKey = findKey(row, ["inspectionno", "inspectionnumber", "insno", "inspection_no"]);
           const insNoVal = insNoKey ? String(row[insNoKey]).trim() : "INS-BULK";

@@ -142,6 +142,19 @@ class DispatchCreate(BaseModel):
     packaging_status: Optional[str] = "Pending For Mark"
 
 
+def normalize_packaging_status(raw_status: Optional[str]) -> str:
+    if not raw_status or pd.isna(raw_status):
+        return "Pending For Mark"
+    s = str(raw_status).strip().lower()
+    if "transit" in s:
+        return "Already in Transit"
+    if "dispatched" in s or s == "sent":
+        return "Dispatched"
+    if "mark" in s or "pending" in s:
+        return "Pending For Mark"
+    return str(raw_status).strip().title()
+
+
 @router.post("/dispatch")
 def create_dispatch(
     payload: DispatchCreate,
@@ -161,7 +174,7 @@ def create_dispatch(
         set_type=set_type_val,
         quantity=payload.quantity,
         ms_barcode=payload.ms_barcode,
-        packaging_status=payload.packaging_status
+        packaging_status=normalize_packaging_status(payload.packaging_status)
     )
     db.add(new_dispatch)
     db.commit()
@@ -288,7 +301,7 @@ def create_dispatches_bulk(
                     set_type=set_type_val,
                     quantity=entry.quantity,
                     ms_barcode=entry.ms_barcode,
-                    packaging_status=entry.packaging_status
+                    packaging_status=normalize_packaging_status(entry.packaging_status)
                 )
             )
         db.add_all(new_dispatches)
@@ -417,7 +430,11 @@ async def upload_dispatch_excel(
             # 6. Quantity (quantity)
             val_qty = get_col_val(row, ["Dispatched as per payment sheet", "Quantity", "Qty", "Dispatched", "Dispatched Quantity", "DispatchedQuantity"])
             # 7. Pkg Status (packaging_status)
-            val_status = get_col_val(row, ["Dispatch Status", "Pkg Status", "Status"])
+            val_status = get_col_val(row, [
+                "Packaging Status", "PackagingStatus", "Pkg Status", "PkgStatus", 
+                "Dispatch Status", "DispatchStatus", "Status", "Packaging Status / Remark", 
+                "Status / Remark", "Packaging", "Dispatch Status / Remark", "Remark", "Pkg Status / Remark"
+            ])
 
             # 8. MS No./Barcode (ms_barcode) - Combine label numbers 1, 2, 3 if they exist
             barcode_parts = []
@@ -460,7 +477,7 @@ async def upload_dispatch_excel(
             elif val_set:
                 set_type_str = str(val_set).strip().upper()
 
-            status_str = str(val_status).strip() if val_status else "Pending For Mark"  # type: ignore
+            status_str = normalize_packaging_status(val_status)
 
             # Parse quantity
             qty_int = 0
