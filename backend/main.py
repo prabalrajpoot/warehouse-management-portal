@@ -30,11 +30,17 @@ from app.models.man_power import ManPower, ManPowerWorker
 import os
 from fastapi.middleware.cors import CORSMiddleware
 
-# Ensure firm_name column exists in PostgreSQL tables
+# Ensure required columns exist in PostgreSQL tables (safe migrations)
 try:
     with engine.connect() as conn:
         conn.execute(text("ALTER TABLE inventory_inward ADD COLUMN IF NOT EXISTS firm_name VARCHAR;"))
         conn.execute(text("ALTER TABLE inventory_outward ADD COLUMN IF NOT EXISTS firm_name VARCHAR;"))
+        # kits.firm is critical for dashboard PTL/VTL/ITI breakdown
+        conn.execute(text("ALTER TABLE kits ADD COLUMN IF NOT EXISTS firm VARCHAR;"))
+        conn.execute(text("ALTER TABLE kits ADD COLUMN IF NOT EXISTS set_type VARCHAR;"))
+        # inspection and dispatch may also need firm
+        conn.execute(text("ALTER TABLE inspection ADD COLUMN IF NOT EXISTS firm VARCHAR;"))
+        conn.execute(text("ALTER TABLE dispatch ADD COLUMN IF NOT EXISTS firm VARCHAR;"))
         conn.commit()
 except Exception as _e:
     print("Database column alteration note:", _e)
