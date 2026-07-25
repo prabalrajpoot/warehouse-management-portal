@@ -1182,13 +1182,33 @@ function Dashboard() {
                       <div className="stat-label">{s.label}</div>
                       <div className="stat-value" style={{ color: s.color }}>{s.value}</div>
                     </div>
-                    {(s.label === "Kit Made" || s.label === "Kits Made" || s.label === "Total Kits Made") && (
-                      <div style={{ fontSize: "10.5px", color: "var(--text-secondary)", marginTop: "8px", borderTop: "1px solid var(--border)", paddingTop: "6px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "4px", whiteSpace: "nowrap" }}>
-                        <span style={{ color: "var(--accent)", fontWeight: 600 }}>🔹PTL: {data.kits_ptl || 0}</span>
-                        <span style={{ color: "var(--success)", fontWeight: 600 }}>🔹VTL: {data.kits_vtl || 0}</span>
-                        <span style={{ color: "var(--warning)", fontWeight: 600 }}>🔹ITI: {data.kits_iti || 0}</span>
-                      </div>
-                    )}
+                    {(s.label === "Kit Made" || s.label === "Kits Made" || s.label === "Total Kits Made") && (() => {
+                      let ptl = data.kits_ptl || 0;
+                      let vtl = data.kits_vtl || 0;
+                      let iti = data.kits_iti || 0;
+
+                      if (ptl === 0 && vtl === 0 && iti === 0 && data.total_kits > 0 && data.trade_summary) {
+                        data.trade_summary.forEach(item => {
+                          const tradeName = (item.name || "").toLowerCase();
+                          const qty = item["Kits Made"] || 0;
+                          if (["armourer", "metal", "sculptor", "hammer", "fishing", "boat"].some(x => tradeName.includes(x))) {
+                            ptl += qty;
+                          } else if (["potter", "washerman", "kumhar", "dhobi"].some(x => tradeName.includes(x))) {
+                            vtl += qty;
+                          } else {
+                            ptl += qty;
+                          }
+                        });
+                      }
+
+                      return (
+                        <div style={{ fontSize: "10.5px", color: "var(--text-secondary)", marginTop: "8px", borderTop: "1px solid var(--border)", paddingTop: "6px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "4px", whiteSpace: "nowrap" }}>
+                          <span style={{ color: "var(--accent)", fontWeight: 600 }}>🔹PTL: {ptl}</span>
+                          <span style={{ color: "var(--success)", fontWeight: 600 }}>🔹VTL: {vtl}</span>
+                          <span style={{ color: "var(--warning)", fontWeight: 600 }}>🔹ITI: {iti}</span>
+                        </div>
+                      );
+                    })()}
                     {s.label === "Inspected Qty" && (
                       <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "8px", borderTop: "1px solid var(--border)", paddingTop: "6px", display: "flex", flexWrap: "wrap", gap: "10px" }}>
                         <span style={{ color: "var(--success)", fontWeight: 600 }}>✔ Pass: {data.inspected_passed}</span>

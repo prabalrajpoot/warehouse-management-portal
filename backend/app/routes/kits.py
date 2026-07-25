@@ -20,6 +20,24 @@ class KitCreate(BaseModel):
     quantity: int
 
 
+def resolve_firm(firm_input, trade_val, set_type_val):
+    if firm_input and str(firm_input).strip():
+        f = str(firm_input).strip().upper()
+        if "PTL" in f: return "PTL"
+        if "VTL" in f: return "VTL"
+        if "ITI" in f: return "ITI"
+        return f
+    t = (trade_val or "").strip().lower()
+    s = (set_type_val or "").strip().upper()
+    if any(x in t for x in ["armourer", "metal", "sculptor", "hammer", "fishing", "boat"]):
+        return "PTL"
+    if any(x in t for x in ["potter", "kumhar", "washerman", "dhobi"]):
+        return "VTL"
+    if any(x in t for x in ["barber", "naai"]):
+        return "ITI" if "B" in s else "PTL"
+    return "PTL"
+
+
 @router.post("/kits")
 def create_kit(
     payload: KitCreate,
@@ -31,10 +49,11 @@ def create_kit(
     trade_val = mapped_trade if mapped_trade else payload.trade
     set_type_val = mapped_set if mapped_set else payload.set_type
     wh_val = map_fuzzy_warehouse_name(payload.warehouse_name)
+    firm_val = resolve_firm(payload.firm, trade_val, set_type_val)
 
     new_kit = Kit(
         call_date=payload.call_date,
-        firm=payload.firm,
+        firm=firm_val,
         warehouse_name=wh_val,
         trade=trade_val,
         set_type=set_type_val,
@@ -156,11 +175,12 @@ def create_kits_bulk(
             trade_val = mapped_trade if mapped_trade else entry.trade
             set_type_val = mapped_set if mapped_set else entry.set_type
             wh_val = map_fuzzy_warehouse_name(entry.warehouse_name)
+            firm_val = resolve_firm(entry.firm, trade_val, set_type_val)
             
             new_kits.append(
                 Kit(
                     call_date=entry.call_date,
-                    firm=entry.firm,
+                    firm=firm_val,
                     warehouse_name=wh_val,
                     trade=trade_val,
                     set_type=set_type_val,
