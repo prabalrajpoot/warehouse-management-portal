@@ -214,8 +214,18 @@ function Kits() {
 
         const findKey = (obj, aliases) => {
           const keys = Object.keys(obj);
+          // Pass 1: Exact match
           for (const alias of aliases) {
             const match = keys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g, "") === alias.toLowerCase().replace(/[^a-z0-9]/g, ""));
+            if (match) return match;
+          }
+          // Pass 2: Substring match
+          for (const alias of aliases) {
+            const match = keys.find(k => {
+              const normK = k.toLowerCase().replace(/[^a-z0-9]/g, "");
+              const normA = alias.toLowerCase().replace(/[^a-z0-9]/g, "");
+              return normK.includes(normA) || normA.includes(normK);
+            });
             if (match) return match;
           }
           return null;
@@ -247,13 +257,13 @@ function Kits() {
             }
           }
 
-          const whKey = findKey(row, ["warehousename", "warehouse", "location", "warehouse_name", "pickuplocation"]);
+          const whKey = findKey(row, ["warehousename", "warehouse", "location", "warehouse_name", "pickuplocation", "site"]);
           const whVal = whKey ? String(row[whKey]).trim() : "";
 
           const tradeKey = findKey(row, ["trade", "tradename", "workertype", "tradename"]);
           const tradeVal = tradeKey ? String(row[tradeKey]).trim() : "";
 
-          const firmKey = findKey(row, ["firm", "company", "agency", "vendorname"]);
+          const firmKey = findKey(row, ["firm", "company", "agency", "vendorname", "vendor", "firmname", "supplier", "vendornameptlvtliti"]);
           const firmVal = firmKey ? String(row[firmKey]).trim() : "";
 
           const setTypeKey = findKey(row, ["settype", "set_type", "type", "typename"]);
