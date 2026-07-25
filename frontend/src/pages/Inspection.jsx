@@ -214,8 +214,18 @@ function Inspection() {
 
         const findKey = (obj, aliases) => {
           const keys = Object.keys(obj);
+          // Pass 1: Exact match
           for (const alias of aliases) {
             const match = keys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g, "") === alias.toLowerCase().replace(/[^a-z0-9]/g, ""));
+            if (match) return match;
+          }
+          // Pass 2: Partial / Substring match
+          for (const alias of aliases) {
+            const match = keys.find(k => {
+              const normK = k.toLowerCase().replace(/[^a-z0-9]/g, "");
+              const normA = alias.toLowerCase().replace(/[^a-z0-9]/g, "");
+              return normK.includes(normA) || normA.includes(normK);
+            });
             if (match) return match;
           }
           return null;
@@ -244,70 +254,104 @@ function Inspection() {
           }
         };
 
-        const parsedRows = rows.map(row => {
-          const dateKey = findKey(row, ["calldate", "date", "dateofcall", "call_date", "inspectioncompletedates", "inspectioncompletedate", "dispatchdates", "dispatchdate", "month"]);
-          const dateVal = parseDateVal(row, dateKey);
+        const parsedRows = [];
+        rows.forEach(row => {
+          const dateKey = findKey(row, ["calldate", "date", "dateofcall", "call_date", "inspectioncompletedates", "inspectioncompletedate", "dispatchdates", "dispatchdate", "month", "inspectiondate", "offereddate"]);
+          const dateVal = parseDateVal(row, dateKey) || new Date().toLocaleDateString("en-GB");
 
-          const insPassedDateKey = findKey(row, ["inspasseddate", "inspectionpasseddate", "passeddate", "ins_passed_date"]);
+          const insPassedDateKey = findKey(row, ["inspasseddate", "inspectionpasseddate", "passeddate", "ins_passed_date", "passdate"]);
           const insPassedDateVal = parseDateVal(row, insPassedDateKey);
 
-          const whKey = findKey(row, ["warehousename", "warehouse", "location", "warehouse_name", "pickuplocation"]);
+          const whKey = findKey(row, ["warehousename", "warehouse", "location", "warehouse_name", "pickuplocation", "site"]);
           const whVal = whKey ? String(row[whKey]).trim() : "";
 
           const tradeKey = findKey(row, ["trade", "tradename", "workertype", "tradename"]);
           const tradeVal = tradeKey ? String(row[tradeKey]).trim() : "";
 
-          const firmKey = findKey(row, ["firm", "company", "agency", "vendorname"]);
+          const firmKey = findKey(row, ["firm", "company", "agency", "vendorname", "vendor"]);
           const firmVal = firmKey ? String(row[firmKey]).trim() : "";
 
           const setTypeKey = findKey(row, ["settype", "set_type", "type", "typename"]);
           const setTypeVal = setTypeKey ? String(row[setTypeKey]).trim() : "";
 
-          const passedKey = findKey(row, [
-            "inspectionpassed", "passed", "status", "passedstatus", "inspection_passed",
-            "result", "inspectionresult", "qaaresult", "offerresult", "passfail", "inspectionstatus",
-            "qaa", "qaastatus", "inspection_result", "qaa_result", "offer_result", "pass_fail",
-            "inspection_status", "remark", "inspection_remark", "outcome", "statusremark"
-          ]);
-          
-          let passedVal = "Pass";
-          if (passedKey && row[passedKey] !== undefined && row[passedKey] !== null) {
-            const rawStr = String(row[passedKey]).trim();
-            const lowerStr = rawStr.toLowerCase();
-            if (lowerStr.includes("fail") || lowerStr.includes("reject") || lowerStr === "f" || lowerStr === "0") {
-              passedVal = "Fail";
-            } else if (lowerStr.includes("pend") || lowerStr.includes("hold") || lowerStr.includes("under")) {
-              passedVal = "Pending";
-            } else if (lowerStr.includes("pass") || lowerStr === "p" || lowerStr === "1" || lowerStr.includes("ok")) {
-              passedVal = "Pass";
-            } else if (rawStr) {
-              passedVal = rawStr.charAt(0).toUpperCase() + rawStr.slice(1).toLowerCase();
-            }
-          }
-
-          const insNoKey = findKey(row, ["inspectionno", "inspectionnumber", "insno", "inspection_no"]);
+          const insNoKey = findKey(row, ["inspectionno", "inspectionnumber", "insno", "inspection_no", "callno", "offerno"]);
           const insNoVal = insNoKey ? String(row[insNoKey]).trim() : "INS-BULK";
-
-          const qtyKey = findKey(row, ["inspectedqty", "inspected", "inspectedquantity", "inspected quantity", "quantity", "qty", "count"]);
-          const qtyVal = qtyKey ? Number(row[qtyKey]) : 0; // Default to 0 if no quantity matches
 
           // Map fuzzy trade and set type
           const mapped = mapFuzzyTradeAndSetType(tradeVal);
           const finalTrade = mapped.trade || tradeVal;
           const finalSetType = mapped.set_type || (setTypeVal ? setTypeVal.toUpperCase() : null);
 
-          return {
-            call_date: dateVal,
-            firm: firmVal || null,
-            warehouse_name: whVal || null,
-            trade: finalTrade || null,
-            set_type: finalSetType,
-            inspection_passed: passedVal,
-            inspection_no: insNoVal,
-            ins_passed_date: insPassedDateVal || null,
-            quantity: isNaN(qtyVal) ? 0 : qtyVal
-          };
-        }).filter(r => r.call_date && r.inspection_no && r.inspection_passed);
+          // Check if row has separate quantity columns for Pass / Fail / Pending
+          const passQtyKey = findKey(row, ["passedqty", "passqty", "passedquantity", "passquantity"]);
+          const failQtyKey = findKey(row, ["failedqty", "failqty", "failedquantity", "failquantity", "rejectedqty"]);
+          const pendQtyKey = findKey(row, ["pendingqty", "pendqty", "pendingquantity", "holdqty"]);
+
+          if (passQtyKey || failQtyKey || pendQtyKey) {
+            if (passQtyKey && Number(row[passQtyKey]) > 0) {
+              parsedRows.push({
+                call_date: dateVal, firm: firmVal || null, warehouse_name: whVal || null,
+                trade: finalTrade || null, set_type: finalSetType, inspection_passed: "Pass",
+                inspection_no: insNoVal, ins_passed_date: insPassedDateVal || null,
+                quantity: Number(row[passQtyKey])
+              });
+            }
+            if (failQtyKey && Number(row[failQtyKey]) > 0) {
+              parsedRows.push({
+                call_date: dateVal, firm: firmVal || null, warehouse_name: whVal || null,
+                trade: finalTrade || null, set_type: finalSetType, inspection_passed: "Fail",
+                inspection_no: insNoVal, ins_passed_date: insPassedDateVal || null,
+                quantity: Number(row[failQtyKey])
+              });
+            }
+            if (pendQtyKey && Number(row[pendQtyKey]) > 0) {
+              parsedRows.push({
+                call_date: dateVal, firm: firmVal || null, warehouse_name: whVal || null,
+                trade: finalTrade || null, set_type: finalSetType, inspection_passed: "Pending",
+                inspection_no: insNoVal, ins_passed_date: insPassedDateVal || null,
+                quantity: Number(row[pendQtyKey])
+              });
+            }
+          } else {
+            // Standard single status column
+            const passedKey = findKey(row, [
+              "inspectionpassed", "passed", "status", "passedstatus", "inspection_passed",
+              "result", "inspectionresult", "qaaresult", "offerresult", "passfail", "inspectionstatus",
+              "qaa", "qaastatus", "inspection_result", "qaa_result", "offer_result", "pass_fail",
+              "inspection_status", "remark", "inspection_remark", "outcome", "statusremark", "qcresult", "finalstatus"
+            ]);
+
+            let passedVal = "Pass";
+            if (passedKey && row[passedKey] !== undefined && row[passedKey] !== null) {
+              const rawStr = String(row[passedKey]).trim();
+              const lowerStr = rawStr.toLowerCase();
+              if (lowerStr.includes("fail") || lowerStr.includes("reject") || lowerStr === "f" || lowerStr === "0") {
+                passedVal = "Fail";
+              } else if (lowerStr.includes("pend") || lowerStr.includes("hold") || lowerStr.includes("under")) {
+                passedVal = "Pending";
+              } else if (lowerStr.includes("pass") || lowerStr === "p" || lowerStr === "1" || lowerStr.includes("ok")) {
+                passedVal = "Pass";
+              } else if (rawStr) {
+                passedVal = rawStr.charAt(0).toUpperCase() + rawStr.slice(1).toLowerCase();
+              }
+            }
+
+            const qtyKey = findKey(row, ["inspectedqty", "inspected", "inspectedquantity", "inspected quantity", "quantity", "qty", "count"]);
+            const qtyVal = qtyKey ? Number(row[qtyKey]) : 0;
+
+            parsedRows.push({
+              call_date: dateVal,
+              firm: firmVal || null,
+              warehouse_name: whVal || null,
+              trade: finalTrade || null,
+              set_type: finalSetType,
+              inspection_passed: passedVal,
+              inspection_no: insNoVal,
+              ins_passed_date: insPassedDateVal || null,
+              quantity: isNaN(qtyVal) ? 0 : qtyVal
+            });
+          }
+        });
 
         if (parsedRows.length === 0) {
           alert("Could not parse any valid rows. Please check that Date, Inspection No, and Status (Pass/Fail) columns exist.");

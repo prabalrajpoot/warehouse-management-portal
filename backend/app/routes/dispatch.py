@@ -401,13 +401,21 @@ async def upload_dispatch_excel(
             detail="Invalid Excel file format. Please upload a valid .xlsx or .xls file."
         )
 
-    # Let's normalize the columns matching
+    # Let's normalize the columns matching (Pass 1: Exact, Pass 2: Substring)
     def get_col_val(row, aliases):
         for alias in aliases:
-            norm_alias = alias.strip().lower().replace("_", "").replace(" ", "").replace(".", "").replace("/", "").replace("-", "")
+            norm_alias = alias.strip().lower().replace("_", "").replace(" ", "").replace(".", "").replace("/", "").replace("-", "").replace("?", "")
             for c in df.columns:
-                norm_c = str(c).strip().lower().replace("_", "").replace(" ", "").replace(".", "").replace("/", "").replace("-", "")
+                norm_c = str(c).strip().lower().replace("_", "").replace(" ", "").replace(".", "").replace("/", "").replace("-", "").replace("?", "")
                 if norm_c == norm_alias:
+                    val = row[c]
+                    if not pd.isna(val):
+                        return val
+        for alias in aliases:
+            norm_alias = alias.strip().lower().replace("_", "").replace(" ", "").replace(".", "").replace("/", "").replace("-", "").replace("?", "")
+            for c in df.columns:
+                norm_c = str(c).strip().lower().replace("_", "").replace(" ", "").replace(".", "").replace("/", "").replace("-", "").replace("?", "")
+                if norm_alias and (norm_alias in norm_c or norm_c in norm_alias):
                     val = row[c]
                     if not pd.isna(val):
                         return val
