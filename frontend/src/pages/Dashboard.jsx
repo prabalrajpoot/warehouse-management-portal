@@ -38,6 +38,8 @@ function Dashboard() {
   const [reportsLoading, setReportsLoading] = useState(false);
   const [editingRowKey, setEditingRowKey] = useState(null);
   const [editVal, setEditVal] = useState("");
+  const [editingAdviceRowKey, setEditingAdviceRowKey] = useState(null);
+  const [editAdviceVal, setEditAdviceVal] = useState("");
   const [theme, setTheme] = useState(localStorage.getItem("theme") || "light");
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [selectedOfferingMonth, setSelectedOfferingMonth] = useState("");
@@ -183,6 +185,28 @@ function Dashboard() {
     }
   };
 
+  const saveAdviceOverride = async () => {
+    if (editingAdviceRowKey === null) return;
+    const [co, trDisplay] = editingAdviceRowKey.split("|");
+    const rowObj = (reports.offering_report || []).find(r => r.company === co && r.trade === trDisplay);
+    if (!rowObj) return;
+
+    try {
+      await api.post("/dashboard/reports/advice-override", {
+        company: co,
+        trade: rowObj.trade_cat || rowObj.trade,
+        set_type: rowObj.set_type || "SET A",
+        advice_qty: Number(editAdviceVal) || 0
+      });
+      setEditingAdviceRowKey(null);
+      fetchReports();
+      fetchDashboard();
+    } catch (e) {
+      console.log(e);
+      alert("Failed to save advice override.");
+    }
+  };
+
   const exportPDF = () => {
     const doc = new jsPDF();
     doc.setFontSize(18);
@@ -245,8 +269,6 @@ function Dashboard() {
       "Pending Delivery": row.pending_delivery,
       "Sale Rate": row.sale_rate,
       "Payment Delivered": row.payment_delivered,
-      "30% Pending Dispatch": row.pending_dispatch_val,
-      "70% Pending Delivery": row.pending_delivery_val,
       "Return Val": row.return_val,
       "Total Value": row.total_value
     }));
@@ -367,17 +389,10 @@ function Dashboard() {
     const trendRow = {};
     months.forEach((m, idx) => {
       if (idx === 0) {
-        trendRow[m] = totalRow[m] - 2942; // Dec'24 default base fallback offset
+        trendRow[m] = totalRow[m];
       } else {
         const prevMonth = months[idx - 1];
-        // Apply manual screenshot overrides to keep UI perfectly aligned
-        if (m === "Jan'26") {
-          trendRow[m] = -9401; // Match screenshot precisely
-        } else if (m === "Mar'26") {
-          trendRow[m] = -13180; // Match screenshot precisely
-        } else {
-          trendRow[m] = totalRow[m] - totalRow[prevMonth];
-        }
+        trendRow[m] = totalRow[m] - totalRow[prevMonth];
       }
     });
 
@@ -542,7 +557,37 @@ function Dashboard() {
                   <td style={{ fontWeight: 600, color: "var(--text-primary)" }}>{row.trade}</td>
                   <td><span className={`badge ${row.company === 'PTL' ? 'badge-purple' : row.company === 'ITI' ? 'badge-blue' : 'badge-green'}`}>{row.company}</span></td>
                   <td style={{ textAlign: "right" }}>{row.po_qty.toLocaleString()}</td>
-                  <td style={{ textAlign: "right" }}>{row.advice_qty.toLocaleString()}</td>
+                  <td
+                    style={{ textAlign: "right", cursor: isReadOnly() ? "default" : "pointer", position: "relative" }}
+                    onDoubleClick={() => {
+                      if (isReadOnly()) return;
+                      setEditingAdviceRowKey(`${row.company}|${row.trade}`);
+                      setEditAdviceVal(row.advice_qty || 0);
+                    }}
+                    title={isReadOnly() ? "" : "Double-click to edit Advice Qty"}
+                  >
+                    {editingAdviceRowKey === `${row.company}|${row.trade}` ? (
+                      <input
+                        type="number"
+                        value={editAdviceVal}
+                        onChange={(e) => setEditAdviceVal(e.target.value)}
+                        onBlur={saveAdviceOverride}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") saveAdviceOverride();
+                          else if (e.key === "Escape") setEditingAdviceRowKey(null);
+                        }}
+                        style={{ width: "80px", textAlign: "right", padding: "2px 4px", fontSize: "11px", height: "24px", background: "var(--bg-elevated)", color: "var(--text-primary)", border: "1px solid var(--accent)", borderRadius: "4px" }}
+                        autoFocus
+                      />
+                    ) : (
+                      <>
+                        {row.advice_qty ? row.advice_qty.toLocaleString() : "0"}
+                        {!isReadOnly() && (
+                          <span style={{ fontSize: "8px", color: "var(--text-muted)", marginLeft: "4px", opacity: 0.6 }}>✏️</span>
+                        )}
+                      </>
+                    )}
+                  </td>
                   <td style={{ textAlign: "right", fontWeight: 700 }}>{row.total_offered.toLocaleString()}</td>
                   <td style={{ textAlign: "right", color: row.pending_demand > 0 ? "var(--accent)" : "var(--text-secondary)" }}>{row.pending_demand.toLocaleString()}</td>
                   {months.map(m => (
@@ -721,12 +766,10 @@ function Dashboard() {
                 <td style={{ textAlign: "right" }}>{row.pending_dispatch.toLocaleString()}</td>
                 <td style={{ textAlign: "right" }}>{row.return_qty.toLocaleString()}</td>
                 <td style={{ textAlign: "right" }}>{row.pending_delivery.toLocaleString()}</td>
-                <td style={{ textAlign: "right", fontWeight: "600" }}>{row.sale_rate.toLocaleString()}</td>
-                <td style={{ textAlign: "right" }}>{row.payment_delivered ? row.payment_delivered.toLocaleString() : "—"}</td>
-                <td style={{ textAlign: "right" }}>{row.pending_dispatch_val.toLocaleString()}</td>
-                <td style={{ textAlign: "right" }}>{row.pending_delivery_val.toLocaleString()}</td>
-                <td style={{ textAlign: "right" }}>{row.return_val.toLocaleString()}</td>
-                <td style={{ textAlign: "right", fontWeight: "600" }}>{row.total_value.toLocaleString()}</td>
+                <td style={{ textAlign: "right", fontWeight: "600" }}>{row.sale_rate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 3 })}</td>
+                <td style={{ textAlign: "right" }}>{row.payment_delivered ? row.payment_delivered.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"}</td>
+                <td style={{ textAlign: "right" }}>{row.return_val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td style={{ textAlign: "right", fontWeight: "600" }}>{row.total_value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
               </tr>
             );
           })}
@@ -746,11 +789,9 @@ function Dashboard() {
             <td style={{ textAlign: "right" }}>{groupTotal.return_qty.toLocaleString()}</td>
             <td style={{ textAlign: "right" }}>{groupTotal.pending_delivery.toLocaleString()}</td>
             <td style={{ textAlign: "right" }}>—</td>
-            <td style={{ textAlign: "right" }}>{groupTotal.payment_delivered.toLocaleString()}</td>
-            <td style={{ textAlign: "right" }}>{groupTotal.pending_dispatch_val.toLocaleString()}</td>
-            <td style={{ textAlign: "right" }}>{groupTotal.pending_delivery_val.toLocaleString()}</td>
-            <td style={{ textAlign: "right" }}>{groupTotal.return_val.toLocaleString()}</td>
-            <td style={{ textAlign: "right" }}>{groupTotal.total_value.toLocaleString()}</td>
+            <td style={{ textAlign: "right" }}>{groupTotal.payment_delivered.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td style={{ textAlign: "right" }}>{groupTotal.return_val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td style={{ textAlign: "right" }}>{groupTotal.total_value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
           </tr>
         </>
       );

@@ -10,3 +10,4 @@ class DeliveryOverride(Base):
     trade = Column(String, index=True)
     set_type = Column(String, index=True)
     delivery_qty = Column(Integer, default=0)
+    advice_qty = Column(Integer, nullable=True)

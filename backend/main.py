@@ -39,6 +39,7 @@ try:
         conn.execute(text("ALTER TABLE kits ADD COLUMN IF NOT EXISTS set_type VARCHAR;"))
         conn.execute(text("ALTER TABLE inspection ADD COLUMN IF NOT EXISTS firm VARCHAR;"))
         conn.execute(text("ALTER TABLE dispatch ADD COLUMN IF NOT EXISTS firm VARCHAR;"))
+        conn.execute(text("ALTER TABLE delivery_overrides ADD COLUMN IF NOT EXISTS advice_qty INTEGER;"))
         conn.commit()
 except Exception as _e:
     print("Database column alteration note:", _e)

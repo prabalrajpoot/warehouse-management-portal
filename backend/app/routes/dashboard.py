@@ -502,6 +502,46 @@ def get_dashboard_reports(
     selected_date: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
+class AdviceOverridePayload(BaseModel):
+    company: str
+    trade: str
+    set_type: str
+    advice_qty: int
+
+
+@router.post("/dashboard/reports/advice-override")
+def update_advice_override(
+    payload: AdviceOverridePayload,
+    db: Session = Depends(get_db)
+):
+    from app.models.delivery_override import DeliveryOverride
+    entry = db.query(DeliveryOverride).filter(
+        DeliveryOverride.company == payload.company,
+        DeliveryOverride.trade == payload.trade,
+        DeliveryOverride.set_type == payload.set_type
+    ).first()
+    
+    if entry:
+        entry.advice_qty = payload.advice_qty
+    else:
+        entry = DeliveryOverride(
+            company=payload.company,
+            trade=payload.trade,
+            set_type=payload.set_type,
+            delivery_qty=0,
+            advice_qty=payload.advice_qty
+        )
+        db.add(entry)
+    db.commit()
+    clear_dashboard_cache()
+    return {"message": "Advice Qty updated successfully"}
+
+
+@router.get("/dashboard/reports")
+def get_dashboard_reports(
+    selected_date: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
     cache_key = ("reports", selected_date)
     if cache_key in DASHBOARD_CACHE:
         return DASHBOARD_CACHE[cache_key]
@@ -524,6 +564,11 @@ def get_dashboard_reports(
     override_map = {
         (o.company, o.trade, o.set_type): o.delivery_qty
         for o in overrides
+    }
+    override_advice_map = {
+        (o.company, o.trade, o.set_type): o.advice_qty
+        for o in overrides
+        if o.advice_qty is not None
     }
 
     report_rows = [
@@ -563,21 +608,21 @@ def get_dashboard_reports(
     }
 
     sale_rates = {
-        ("PTL", "Metal Smith / Metal Caster", "SET A"): 19766,
-        ("PTL", "Sculptor (Moortikar)/Stone Carver/Stone Breaker", "SET A"): 20946,
-        ("PTL", "Fishing Net Maker", "SET A"): 15459,
-        ("PTL", "Hammer and ToolKit Maker", "SET A"): 17406,
-        ("PTL", "Armourer", "SET A"): 19705,
-        ("PTL", "Boat Maker", "SET A"): 13630,
-        ("PTL", "Boat Maker", "SET B"): 13630,
-        ("PTL", "Barber (Naai)", "SET A"): 10488,
-        ("PTL", "Barber (Naai)", "SET B"): 10488,
-        ("ITI", "Barber (Naai)", "SET A"): 7341,
-        ("ITI", "Barber (Naai)", "SET B"): 7341,
-        ("ITI", "Washerman (Dhobi)", "SET A"): 8177,
-        ("ITI", "Potter (Kumhar)", "SET A"): 10227,
-        ("VTL", "Washerman (Dhobi)", "SET A"): 11682,
-        ("VTL", "Potter (Kumhar)", "SET A"): 14610
+        ("PTL", "Metal Smith / Metal Caster", "SET A"): 19766.18,
+        ("PTL", "Sculptor (Moortikar)/Stone Carver/Stone Breaker", "SET A"): 20946.18,
+        ("PTL", "Fishing Net Maker", "SET A"): 15459.18,
+        ("PTL", "Hammer and ToolKit Maker", "SET A"): 17406.18,
+        ("PTL", "Armourer", "SET A"): 19704.82,
+        ("PTL", "Boat Maker", "SET A"): 13630.18,
+        ("PTL", "Boat Maker", "SET B"): 13630.18,
+        ("PTL", "Barber (Naai)", "SET A"): 10487.84,
+        ("PTL", "Barber (Naai)", "SET B"): 10487.84,
+        ("ITI", "Barber (Naai)", "SET A"): 10487.84,
+        ("ITI", "Barber (Naai)", "SET B"): 10487.84,
+        ("ITI", "Washerman (Dhobi)", "SET A"): 11682.00,
+        ("ITI", "Potter (Kumhar)", "SET A"): 14610.005,
+        ("VTL", "Washerman (Dhobi)", "SET A"): 11682.00,
+        ("VTL", "Potter (Kumhar)", "SET A"): 14610.005
     }
 
     # Dynamic months_list generation based on actual transaction dates in database
@@ -606,7 +651,10 @@ def get_dashboard_reports(
         row_dispatches = [d for d in dispatches if match_row(d.firm, d.trade, d.set_type, company, trade_cat, set_t)]
         row_returns = [r for r in returns if match_row(r.firm, r.trade, r.set_type, company, trade_cat, set_t)]
 
-        po_qty, advice_qty = po_advice_data.get((company, trade_cat, set_t), (0, 0))
+        po_qty, default_advice_qty = po_advice_data.get((company, trade_cat, set_t), (0, 0))
+        overridden_advice = override_advice_map.get((company, trade_cat, set_t))
+        advice_qty = overridden_advice if overridden_advice is not None else default_advice_qty
+
         sale_rate = sale_rates.get((company, trade_cat, set_t), 0)
 
         total_kitting = sum(k.quantity for k in row_kits)
