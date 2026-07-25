@@ -426,32 +426,41 @@ def match_row(company, trade, set_type, target_co, target_tr, target_set):
     tr_clean = str(trade).strip().lower()
     target_tr_clean = str(target_tr).strip().lower()
     
-    if tr_clean == target_tr_clean:
-        tr_match = True
-    else:
-        def clean_text(s):
-            return s.replace(" ", "").replace("/", "").replace("(", "").replace(")", "").replace("-", "").lower()
-        tr_match = clean_text(tr_clean) == clean_text(target_tr_clean)
-        if not tr_match:
-            if "boat" in tr_clean and "boat" in target_tr_clean:
-                tr_match = True
-            elif "barber" in tr_clean and "barber" in target_tr_clean:
-                tr_match = True
-            elif "naai" in tr_clean and "naai" in target_tr_clean:
-                tr_match = True
-            elif "potter" in tr_clean and "potter" in target_tr_clean:
-                tr_match = True
-            elif "washer" in tr_clean and "washer" in target_tr_clean:
-                tr_match = True
+    def clean_text(s):
+        return s.replace(" ", "").replace("/", "").replace("(", "").replace(")", "").replace("-", "").lower()
+        
+    tr_match = clean_text(tr_clean) == clean_text(target_tr_clean)
+    if not tr_match:
+        if "boat" in tr_clean and "boat" in target_tr_clean:
+            tr_match = True
+        elif ("barber" in tr_clean or "naai" in tr_clean) and ("barber" in target_tr_clean or "naai" in target_tr_clean):
+            tr_match = True
+        elif ("potter" in tr_clean or "kumhar" in tr_clean) and ("potter" in target_tr_clean or "kumhar" in target_tr_clean):
+            tr_match = True
+        elif ("washer" in tr_clean or "dhobi" in tr_clean) and ("washer" in target_tr_clean or "dhobi" in target_tr_clean):
+            tr_match = True
+        elif "metal" in tr_clean and "metal" in target_tr_clean:
+            tr_match = True
+        elif "sculptor" in tr_clean and "sculptor" in target_tr_clean:
+            tr_match = True
+        elif "fishing" in tr_clean and "fishing" in target_tr_clean:
+            tr_match = True
+        elif ("hammer" in tr_clean or "ht maker" in tr_clean or "toolkit" in tr_clean) and ("hammer" in target_tr_clean or "ht maker" in target_tr_clean or "toolkit" in target_tr_clean):
+            tr_match = True
+        elif "armourer" in tr_clean and "armourer" in target_tr_clean:
+            tr_match = True
 
     if not tr_match:
         return False
 
-    set_clean = str(set_type).strip().upper() if set_type else "SET A"
-    if not set_clean or set_clean == "NONE" or set_clean == "NULL":
-        set_clean = "SET A"
-    target_set_clean = str(target_set).strip().upper()
-    return set_clean == target_set_clean
+    def clean_set(s):
+        if not s: return "SET A"
+        sc = str(s).strip().upper().replace("-", " ").replace("_", " ")
+        if "SET B" in sc or "SETB" in sc or sc.endswith("B"):
+            return "SET B"
+        return "SET A"
+
+    return clean_set(set_type) == clean_set(target_set)
 
 
 class DeliveryOverridePayload(BaseModel):
