@@ -136,11 +136,21 @@ def dashboard(
             return "VTL"
         if "ITI" in f:
             return "ITI"
-        # Fallback from trade name when firm is NULL/empty in DB
+
         t = (k.trade or "").strip().lower()
-        if any(x in t for x in ["barber", "naai"]):
-            return "ITI"
-        if any(x in t for x in ["potter", "kumhar", "washerman", "dhobi"]):
+        s = (k.set_type or "").strip().upper()
+
+        if "barber" in t or "naai" in t:
+            if "B" in s or "SET B" in s:
+                return "ITI"
+            return "PTL"
+        if "potter" in t or "kumhar" in t:
+            if (k.quantity or 0) < 500:
+                return "ITI"
+            return "VTL"
+        if "washer" in t or "dhobi" in t:
+            if (k.quantity or 0) < 500:
+                return "ITI"
             return "VTL"
         return "PTL"
 

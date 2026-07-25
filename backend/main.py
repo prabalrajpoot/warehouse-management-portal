@@ -35,12 +35,17 @@ try:
     with engine.connect() as conn:
         conn.execute(text("ALTER TABLE inventory_inward ADD COLUMN IF NOT EXISTS firm_name VARCHAR;"))
         conn.execute(text("ALTER TABLE inventory_outward ADD COLUMN IF NOT EXISTS firm_name VARCHAR;"))
-        # kits.firm is critical for dashboard PTL/VTL/ITI breakdown
         conn.execute(text("ALTER TABLE kits ADD COLUMN IF NOT EXISTS firm VARCHAR;"))
         conn.execute(text("ALTER TABLE kits ADD COLUMN IF NOT EXISTS set_type VARCHAR;"))
-        # inspection and dispatch may also need firm
         conn.execute(text("ALTER TABLE inspection ADD COLUMN IF NOT EXISTS firm VARCHAR;"))
         conn.execute(text("ALTER TABLE dispatch ADD COLUMN IF NOT EXISTS firm VARCHAR;"))
+
+        # Populate firm for legacy NULL/empty rows in kits table
+        conn.execute(text("UPDATE kits SET firm = 'PTL' WHERE (firm IS NULL OR firm = '' OR firm = 'None') AND (trade ILIKE '%armourer%' OR trade ILIKE '%metal%' OR trade ILIKE '%sculptor%' OR trade ILIKE '%hammer%' OR trade ILIKE '%fishing%' OR trade ILIKE '%boat%');"))
+        conn.execute(text("UPDATE kits SET firm = 'PTL' WHERE (firm IS NULL OR firm = '' OR firm = 'None') AND (trade ILIKE '%barber%' OR trade ILIKE '%naai%') AND (set_type ILIKE '%set a%' OR set_type IS NULL OR set_type = '');"))
+        conn.execute(text("UPDATE kits SET firm = 'ITI' WHERE (firm IS NULL OR firm = '' OR firm = 'None') AND (trade ILIKE '%barber%' OR trade ILIKE '%naai%') AND set_type ILIKE '%set b%';"))
+        conn.execute(text("UPDATE kits SET firm = 'ITI' WHERE (firm IS NULL OR firm = '' OR firm = 'None') AND (trade ILIKE '%potter%' OR trade ILIKE '%kumhar%' OR trade ILIKE '%washerman%' OR trade ILIKE '%dhobi%') AND quantity < 500;"))
+        conn.execute(text("UPDATE kits SET firm = 'VTL' WHERE (firm IS NULL OR firm = '' OR firm = 'None') AND (trade ILIKE '%potter%' OR trade ILIKE '%kumhar%' OR trade ILIKE '%washerman%' OR trade ILIKE '%dhobi%');"))
         conn.commit()
 except Exception as _e:
     print("Database column alteration note:", _e)
