@@ -819,7 +819,7 @@ function Dashboard() {
       <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
 
         {/* Value Summary Cards Grid */}
-        <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "20px" }}>
+        <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "20px" }}>
           <div className="glass-card interactive-stat-card" style={{ padding: "20px 22px", borderRadius: "var(--radius-lg)" }}>
             <div className="stat-icon gradient-icon-box"><FiBox size={18} /></div>
             <div className="stat-label">Grand Total Value</div>
@@ -829,15 +829,6 @@ function Dashboard() {
             <div className="stat-icon gradient-icon-box-success"><FiCheckCircle size={18} /></div>
             <div className="stat-label">Delivered Value (100%)</div>
             <div className="stat-value" style={{ color: "var(--success)", fontSize: "24px" }}>₹ {grandTotal.payment_delivered.toLocaleString("en-IN")}</div>
-          </div>
-          <div className="glass-card interactive-stat-card" style={{ padding: "20px 22px", borderRadius: "var(--radius-lg)" }}>
-            <div className="stat-icon gradient-icon-box-warning"><FiTruck size={18} /></div>
-            <div className="stat-label">Pipeline Value (30% + 70%)</div>
-            <div className="stat-value" style={{ color: "var(--warning)", fontSize: "24px" }}>₹ {(grandTotal.pending_dispatch_val + grandTotal.pending_delivery_val).toLocaleString("en-IN")}</div>
-            <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "8px", borderTop: "1px solid var(--border)", paddingTop: "6px", display: "flex", flexDirection: "column", gap: "2px" }}>
-              <span>30% Pend: ₹ {grandTotal.pending_dispatch_val.toLocaleString("en-IN")}</span>
-              <span>70% Transit: ₹ {grandTotal.pending_delivery_val.toLocaleString("en-IN")}</span>
-            </div>
           </div>
           <div className="glass-card interactive-stat-card" style={{ padding: "20px 22px", borderRadius: "var(--radius-lg)" }}>
             <div className="stat-icon gradient-icon-box-danger"><FiRotateCcw size={18} /></div>
@@ -927,8 +918,6 @@ function Dashboard() {
                 <th style={{ textAlign: "right" }}>Pending Delivery</th>
                 <th style={{ textAlign: "right" }}>Sale Rate</th>
                 <th style={{ textAlign: "right" }}>Payment Delivered</th>
-                <th style={{ textAlign: "right" }}>30% Pending Dispatch</th>
-                <th style={{ textAlign: "right" }}>70% Pending Delivery</th>
                 <th style={{ textAlign: "right" }}>Return Val</th>
                 <th style={{ textAlign: "right" }}>Total Value</th>
               </tr>
@@ -953,11 +942,9 @@ function Dashboard() {
                 <td style={{ textAlign: "right" }}>{grandTotal.return_qty.toLocaleString()}</td>
                 <td style={{ textAlign: "right" }}>{grandTotal.pending_delivery.toLocaleString()}</td>
                 <td style={{ textAlign: "right" }}>—</td>
-                <td style={{ textAlign: "right" }}>{grandTotal.payment_delivered.toLocaleString()}</td>
-                <td style={{ textAlign: "right" }}>{grandTotal.pending_dispatch_val.toLocaleString()}</td>
-                <td style={{ textAlign: "right" }}>{grandTotal.pending_delivery_val.toLocaleString()}</td>
-                <td style={{ textAlign: "right" }}>{grandTotal.return_val.toLocaleString()}</td>
-                <td style={{ textAlign: "right" }}>{grandTotal.total_value.toLocaleString()}</td>
+                <td style={{ textAlign: "right" }}>{grandTotal.payment_delivered.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td style={{ textAlign: "right" }}>{grandTotal.return_val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td style={{ textAlign: "right" }}>{grandTotal.total_value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
               </tr>
             </tbody>
           </table>

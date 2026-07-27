@@ -105,23 +105,24 @@ def dashboard(
         dispatches = [d for d in dispatches if d.warehouse_name and d.warehouse_name.strip().lower() == warehouse.lower()]
         inspections = [i for i in inspections if i.warehouse_name and i.warehouse_name.strip().lower() == warehouse.lower()]
     if trade and trade.lower() != "all":
-        kits = [k for k in kits if k.trade and k.trade.strip().lower() == trade.lower()]
-        dispatches = [d for d in dispatches if d.trade and d.trade.strip().lower() == trade.lower()]
-        inspections = [i for i in inspections if i.trade and i.trade.strip().lower() == trade.lower()]
+        t_low = trade.strip().lower()
+        kits = [k for k in kits if k.trade and (t_low in k.trade.lower() or k.trade.lower() in t_low)]
+        dispatches = [d for d in dispatches if d.trade and (t_low in d.trade.lower() or d.trade.lower() in t_low)]
+        inspections = [i for i in inspections if i.trade and (t_low in i.trade.lower() or i.trade.lower() in t_low)]
     if month and month.lower() != "all":
         try:
             m_int = int(month)
-            kits = [k for k in kits if parse_date(k.call_date) and parse_date(k.call_date).month == m_int]
-            dispatches = [d for d in dispatches if parse_date(d.call_date) and parse_date(d.call_date).month == m_int]
-            inspections = [i for i in inspections if parse_date(i.call_date) and parse_date(i.call_date).month == m_int]
+            kits = [k for k in kits if parse_date(k.call_date) and getattr(parse_date(k.call_date), 'month', None) == m_int]
+            dispatches = [d for d in dispatches if parse_date(d.call_date) and getattr(parse_date(d.call_date), 'month', None) == m_int]
+            inspections = [i for i in inspections if parse_date(i.call_date) and getattr(parse_date(i.call_date), 'month', None) == m_int]
         except ValueError:
             pass
     if year and year.lower() != "all":
         try:
             y_int = int(year)
-            kits = [k for k in kits if parse_date(k.call_date) and parse_date(k.call_date).year == y_int]
-            dispatches = [d for d in dispatches if parse_date(d.call_date) and parse_date(d.call_date).year == y_int]
-            inspections = [i for i in inspections if parse_date(i.call_date) and parse_date(i.call_date).year == y_int]
+            kits = [k for k in kits if parse_date(k.call_date) and getattr(parse_date(k.call_date), 'year', None) == y_int]
+            dispatches = [d for d in dispatches if parse_date(d.call_date) and getattr(parse_date(d.call_date), 'year', None) == y_int]
+            inspections = [i for i in inspections if parse_date(i.call_date) and getattr(parse_date(i.call_date), 'year', None) == y_int]
         except ValueError:
             pass
 
@@ -169,13 +170,13 @@ def dashboard(
     if month and month.lower() != "all":
         try:
             m_int = int(month)
-            returns = [r for r in returns if parse_date(r.dispatched_date) and parse_date(r.dispatched_date).month == m_int]
+            returns = [r for r in returns if parse_date(r.dispatched_date) and getattr(parse_date(r.dispatched_date), 'month', None) == m_int]
         except ValueError:
             pass
     if year and year.lower() != "all":
         try:
             y_int = int(year)
-            returns = [r for r in returns if parse_date(r.dispatched_date) and parse_date(r.dispatched_date).year == y_int]
+            returns = [r for r in returns if parse_date(r.dispatched_date) and getattr(parse_date(r.dispatched_date), 'year', None) == y_int]
         except ValueError:
             pass
     total_returned = len(returns)
@@ -453,14 +454,13 @@ def match_row(company, trade, set_type, target_co, target_tr, target_set):
     if not tr_match:
         return False
 
-    def clean_set(s):
-        if not s: return "SET A"
-        sc = str(s).strip().upper().replace("-", " ").replace("_", " ")
-        if "SET B" in sc or "SETB" in sc or sc.endswith("B"):
+    def clean_set(s, tr=""):
+        sc = (str(s or "") + " " + str(tr or "")).strip().upper().replace("-", " ").replace("_", " ")
+        if "SET B" in sc or "SETB" in sc or sc.endswith(" B") or sc.endswith("B"):
             return "SET B"
         return "SET A"
 
-    return clean_set(set_type) == clean_set(target_set)
+    return clean_set(set_type, trade) == clean_set(target_set, target_tr)
 
 
 class DeliveryOverridePayload(BaseModel):
@@ -483,7 +483,7 @@ def update_delivery_override(
     ).first()
     
     if entry:
-        entry.delivery_qty = payload.delivery_qty
+        entry.delivery_qty = payload.delivery_qty  # type: ignore
     else:
         entry = DeliveryOverride(
             company=payload.company,
@@ -497,11 +497,6 @@ def update_delivery_override(
     return {"message": "Delivery updated successfully"}
 
 
-@router.get("/dashboard/reports")
-def get_dashboard_reports(
-    selected_date: Optional[str] = None,
-    db: Session = Depends(get_db)
-):
 class AdviceOverridePayload(BaseModel):
     company: str
     trade: str
@@ -522,7 +517,7 @@ def update_advice_override(
     ).first()
     
     if entry:
-        entry.advice_qty = payload.advice_qty
+        entry.advice_qty = payload.advice_qty  # type: ignore
     else:
         entry = DeliveryOverride(
             company=payload.company,
@@ -685,11 +680,13 @@ def get_dashboard_reports(
             if m_key in month_vals:
                 month_vals[m_key] += i.quantity
 
-        pending_demand = max(0, advice_qty - total_offered)
+        pending_demand = advice_qty - total_offered
 
         offering_report.append({
             "trade": display_name,
             "company": company,
+            "trade_cat": trade_cat,
+            "set_type": set_t,
             "po_qty": po_qty,
             "advice_qty": advice_qty,
             "total_offered": total_offered,
@@ -722,51 +719,6 @@ def get_dashboard_reports(
             "total_value": total_kitting * sale_rate
         })
 
-
-    # Post-processing to group/merge Set A and Set B delivery, pending dispatch, and pending delivery fields
-    groupings = [
-        ("PTL", "Barber Set-A", "Barber Set-B"),
-        ("ITI", "Barber Set-A", "Barber Set-B"),
-        ("PTL", "Boatmaker A", "Boatmaker B")
-    ]
-
-    for co, a_trade, b_trade in groupings:
-        row_a = next((r for r in summary_report if r["company"] == co and r["trade"] == a_trade), None)
-        row_b = next((r for r in summary_report if r["company"] == co and r["trade"] == b_trade), None)
-        
-        if row_a and row_b:
-            has_override = (row_a["company"], row_a["trade_cat"], row_a["set_type"]) in override_map
-            if not has_override:
-                row_a["delivery"] += row_b["delivery"]
-            
-            row_a["pending_dispatch"] += row_b["pending_dispatch"]
-            
-            # Merge today values
-            row_a["today_kitting"] += row_b["today_kitting"]
-            row_a["today_offering"] += row_b["today_offering"]
-            row_a["today_inspection_cleared"] += row_b["today_inspection_cleared"]
-            row_a["today_dispatch"] += row_b["today_dispatch"]
-
-            tot_return = row_a["return_qty"] + row_b["return_qty"]
-            tot_dispatch = row_a["total_dispatch"] + row_b["total_dispatch"]
-            row_a["pending_delivery"] = max(0, tot_dispatch - row_a["delivery"] - tot_return)
-            
-            # Recalculate payment values
-            row_a["payment_delivered"] = row_a["delivery"] * row_a["sale_rate"]
-            row_a["pending_dispatch_val"] = row_a["pending_dispatch"] * row_a["sale_rate"] * 0.70
-            row_a["pending_delivery_val"] = row_a["pending_delivery"] * row_a["sale_rate"] * 0.70
-            
-            # Zero out row_b fields
-            row_b["delivery"] = 0
-            row_b["pending_dispatch"] = 0
-            row_b["pending_delivery"] = 0
-            row_b["payment_delivered"] = 0
-            row_b["pending_dispatch_val"] = 0
-            row_b["pending_delivery_val"] = 0
-            row_b["today_kitting"] = 0
-            row_b["today_offering"] = 0
-            row_b["today_inspection_cleared"] = 0
-            row_b["today_dispatch"] = 0
 
     res = {
         "months": months_list,
